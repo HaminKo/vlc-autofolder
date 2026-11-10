@@ -20,15 +20,15 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
 
 ## Interface script lifecycle (source: modules/lua/intf.c, libs/misc.c)
 - The script is found by name with `vlclua_find_file("intf", name)`; the name comes from the `lua-intf` option. It is unknown whether a full path is accepted.
-- **Chain options:** `config_ChainParse(p_intf, "lua-", ...)` reads options `intf` and `config` from the interface chain. So `extraintf=luaintf{intf=autofolder}` should select our script without changing the global `lua-intf` setting. **Unverified:** try it in To do 1.
+- **Chain options:** `config_ChainParse(p_intf, "lua-", ...)` reads options `intf` and `config` from the interface chain. So `extraintf=luaintf{intf=autofolder}` should select our script without changing the global `lua-intf` setting. **Measured 2026-11-10: works.** `--extraintf "luaintf{intf=a}:luaintf{intf=b}"` runs two Lua interface scripts side by side, each found in the user `lua\intf\` folder. The global `lua-config` string reaches chained scripts too: script `a` gets `config.a`.
 - **lua-config:** the string is run as `config={...}`, and the subtable `config[<script name>]` becomes the script's global `config` (an empty table if missing). Example: `lua-config=autofolder={sort="name"}`.
 - **No `vlc.misc.should_die` in 3.0.** `vlc.misc` has only `version`, `copyright`, `license`, `action_id`, `mdate`, `mwait` and `quit`.
 - **`vlc.misc.mwait(t)`** waits until the absolute time `t` (microseconds, compare `vlc.misc.mdate()`). The wait can be interrupted, and then it raises the Lua error `"Interrupted."`.
-- **Exit:** `Close_LuaIntf` interrupts the script's waits (`vlclua_fd_interrupt`), then joins the thread. So the script ends when `mwait` raises "Interrupted.", and **the main loop must not catch that error** (no `pcall` around `mwait`). A script stuck in a pure Lua loop would probably block VLC from closing. **Unverified:** clean shutdown in To do 1.
+- **Exit:** `Close_LuaIntf` interrupts the script's waits (`vlclua_fd_interrupt`), then joins the thread. So the script ends when `mwait` raises "Interrupted.", and **the main loop must not catch that error** (no `pcall` around `mwait`). A script stuck in a pure Lua loop would probably block VLC from closing. **Measured 2026-11-10: clean.** After `vlc.misc.quit()`, a script waiting in an `mwait` loop ends at once; VLC exited ~0.05 s later with exit code 0. VLC logs this at error level on every close, e.g. `lua error: Error loading script C:\...\lua\intf\autofolder.lua: ...autofolder.lua:17: Interrupted.`, so Tools → Messages shows one such error per close: expected, not a bug.
 - **Libraries** opened for interface scripts: the standard Lua libraries, plus `config`, `httpd`, `input`, `msg`, `misc`, `object`, `osd`, `playlist`, `sd_intf`, `stream`, `strings`, `variables`, `video`, `vlm`, `volume`, `gettext`, `xml`, `equalizer`, `io` (vlcio), `errno`, the fd/net functions, and `win` on Windows.
-  - **Unverified:** that `vlc.net` (with `stat` and `opendir`) is really present in an interface script. The README says the net namespace is usable "for interfaces and extensions".
+  - **Measured 2026-11-10:** `vlc.net` and `vlc.io` are tables in an interface script. **Unverified** until To do 1 step B: that `stat` and `opendir` work there. The README says the net namespace is usable "for interfaces and extensions".
 - No change callbacks: `vlc.var.add_callback` is not in the 3.0 README (only `var.trigger_callback`). The script must **poll**, e.g. `vlc.playlist.current()` every 300–500 ms.
-- Modules: VLC's own `cli` interface loads `require "host"` from `lua\intf\modules\`. So a helper module in `lua\intf\modules\` should load with `require`. **Unverified.**
+- Modules: VLC's own `cli` interface loads `require "host"` from `lua\intf\modules\`. So a helper module in `lua\intf\modules\` should load with `require`. **Measured 2026-11-10: works**, from the user folder too. `package.path` lists, in order: the user `lua\modules\` and `lua\intf\modules\`, then the same two in VLC's own `lua\` folder (`?.luac`, `?.lua`, `?.vle` each).
 
 ## Files and folders (source: libs/net.c, README)
 - **`vlc.net.stat(path)`** takes a local path, not a URI. It returns nil on failure; otherwise a table with:
@@ -41,6 +41,9 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
 - **`vlc.io.open(path, mode)`** and **`vlc.io.readdir(path)`** take UTF-8 paths.
   - Use `vlc.io.open` for the settings file. Plain Lua `io.open` uses the ANSI code page on Windows and fails on non-ASCII paths (**unverified** for VLC's Lua build, but the usual Windows behaviour).
 - **`vlc.config.userdatadir()`** returns the user's VLC data folder (on Windows `%APPDATA%\vlc`). It's a good place for a settings file.
+  - **Measured 2026-11-10:** in portable mode it returns the `portable` folder next to vlc.exe; `vlc.config.datadir()` returns VLC's program folder.
+- **Measured 2026-11-10:** `vlc.io.open(path, "w")` with `:write`, `:flush` and `:close` works in an interface script (the test library writes its results this way).
+  - When it can't open the file (a folder that doesn't exist), it returns **no value at all**, not `nil` plus a message like Lua's `io.open`. So `assert(vlc.io.open(...))` only says "bad argument #1 to 'assert' (value expected)"; check the result and raise your own message.
 
 ## Strings and URIs (source: README)
 - `vlc.strings.make_uri(path, [scheme])` converts a path to a URI.
@@ -75,11 +78,20 @@ From memory of `src/win32/specific.c`, not yet read or tested:
 
 Check both in To do 1 or 2 and document them in the README.
 
-## Test isolation (unverified)
+## Test isolation (measured 2026-11-10, To do 1 step A)
 From memory of `src/win32/dirs.c`:
-- VLC 3.0 finds its user folder with `SHGetFolderPathW(CSIDL_APPDATA)`, **not** the `APPDATA` environment variable. So setting `$env:APPDATA` probably does **not** isolate a test run.
-- VLC uses a `portable` folder next to vlc.exe instead, if one exists.
-- Plan for To do 1: a portable copy of VLC 3.0.24 (zip from videolan.org) in `tools\`, with a `portable` folder, so tests never touch the real settings.
+- VLC 3.0 finds its user folder with `SHGetFolderPathW(CSIDL_APPDATA)`, **not** the `APPDATA` environment variable. So setting `$env:APPDATA` probably does **not** isolate a test run. **Not tested:** the portable folder made it unnecessary.
+- VLC uses a `portable` folder next to vlc.exe instead, if one exists. **Measured: true.** With `tools\vlc\portable\`, the test VLC finds Lua scripts in `portable\lua\intf\`, `userdatadir()` returns `portable\`, and the real `%APPDATA%\vlc` stays unchanged (file list, sizes and dates compared before and after every test run).
+- The setup (decision in decisions.md): the portable VLC 3.0.24 zip in `tools\vlc`, made by `tests\setup-tools.ps1`.
+
+Other facts found while setting it up (measured 2026-11-10):
+- `https://get.videolan.org/...zip` answers PowerShell's browser-like user agent with an HTML mirror page (29 KB) instead of the zip. `https://download.videolan.org/pub/videolan/vlc/3.0.24/win64/vlc-3.0.24-win64.zip` serves the zip directly (82.8 MB, SHA-256 `fcf30850…6323`, matching VideoLAN's `.sha256` file).
+- The zip has no plugin cache (`plugins\plugins.dat`); `vlc-cache-gen.exe plugins` makes it, as the installer does. The first VLC start after unpacking took ~10 s, later starts ~0.3 s until the Lua script runs (cause of the first slow start not checked; probably Windows scanning the new DLLs).
+- Without `--no-media-library`, VLC writes `ml.xspf` into its user folder on exit, even with `-I dummy`.
+- `-I dummy --dummy-quiet --vout dummy --aout dummy` shows no window or console; a file on the command line plays normally.
+- A raw YUV4MPEG2 file plays when named `.mkv` or `.mp4`: the `rawvid` demuxer rejects it ("invalid or no framerate specified"), then the `avcodec` demuxer takes it. VLC reports `length` 120000000 and the item `duration` 120 for a 2-minute file.
+- `vlc.var.get(input, "time")` is in microseconds (1.9 million after ~2 s of playback).
+- A file given on the command line gets the item `path` `file:///C:/Users/.../media/Episode%202.mkv`: forward slashes, three slashes after `file:`, a space as `%20` (the full comparison with `make_uri` comes in step B).
 
 ## Prior art (searched 2026-11-10)
 - No ready-made auto-starting interface script for VLC 3 was found.

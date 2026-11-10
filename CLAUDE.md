@@ -14,11 +14,13 @@ Don't build what's under "Later" in docs/todo.md until asked.
 - Commit after each working step. End a step with the finish-step skill.
 
 ## Build specifics
-**Checks** (the commands become real in To do 1; copy-ready versions in docs/local.md):
+**Checks** (copy-ready versions in docs/local.md):
+- Once per PC: `powershell -ExecutionPolicy Bypass -File tests\setup-tools.ps1` downloads the portable test VLC and luacheck into `tools\` (gitignored; ~10 s measured).
 - Fast, after edits:
-  - luacheck: `tools\luacheck.exe lua tests` (~1 s, estimated)
-  - PowerShell lint: `Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error` (~5–10 s, estimated)
-- Slow, once per step: `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1`. It runs the real VLC with no window, isolated from the real settings (~20–40 s, estimated).
+  - luacheck: `tools\luacheck.exe lua tests` (~0.1 s, measured)
+  - PowerShell lint: `Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error` (~2 s, measured)
+- Once per step: `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1` (`-Case NAME` for one case). It runs the portable VLC in `tools\vlc` with no window, one VLC per case, and fails if `%APPDATA%\vlc` changed (~3 s with 1 case, measured; ~1.5 s per added case, estimated).
+- A test case = an entry in `$cases` in run-tests.ps1 + a driver `tests\lua\intf\test_*.lua` using `require "testlib"`. The runner also fails on any `lua error:` log line except the "Interrupted." that ends a script on exit.
 - No screenshot GUI test (see Decisions). The Qt parts are in the manual checklist (docs/manual-test.md, from To do 5).
 
 **Code rules** (from docs/research/vlc-lua-api.md):
@@ -45,13 +47,14 @@ Now and next: the "Where we are" block at the top of docs/todo.md.
 Reasons, who decided, and what was rejected: docs/decisions.md.
 - The core is a Lua interface script loaded at startup via the extra-interface setting (not an extension, not a playlist script).
 - Tests run the real VLC 3.0.24 with no window, isolated from the real settings; there is no screenshot GUI test.
+- The test VLC is the portable zip in `tools\vlc` with a `portable\` folder; test runs always pass `--no-one-instance`.
 - Public on GitHub later.
 
 ## Project docs
 - README.md
 - docs/spec.md: the original brief
 - docs/local.md: this PC's paths and commands; gitignored
-- docs/todo.md
+- docs/todo.md; docs/todo/: big to-dos in their own files, with a Progress list
 - docs/decisions.md
 - docs/research/: one file per topic (vlc-lua-api.md so far)
 

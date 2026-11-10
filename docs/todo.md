@@ -1,7 +1,7 @@
 # To-dos
 
 ## Where we are
-- Now: To do 1 (Skeleton and API check)
+- Now: To do 1, step B (the API spike)
 - Next: To do 2, 3, 4, 5
 - Updated: 2026-11-10
 
@@ -11,54 +11,8 @@ The requirements are in [spec.md](spec.md), and the API facts and open questions
 
 ## To do
 
-### 1. Skeleton and API check (medium): "Confirm the 3.0.x Lua API details first instead of guessing function names"
-- **Problem / Goal:**
-  - The API facts in research/vlc-lua-api.md were read in the 3.0 source but never run.
-  - Every later to-do needs a way to run Lua inside the real VLC 3.0.24 and check the result without touching the user's real VLC settings.
-- **Read first:**
-  - research/vlc-lua-api.md, especially every "Unverified" item.
-  - decisions.md ("Tests run the real VLC").
-- **Approach:**
-  - **Layout** mirrors VLC's folders, so install can copy it as is:
-    - `lua\intf\autofolder.lua`
-    - `lua\intf\modules\` for a helper module, if `require` works there
-    - `lua\extensions\` (To do 3)
-    - `tests\`
-    - `install.ps1` and `uninstall.ps1` at the top level
-  - **Isolated VLC:**
-    - Download the portable VLC 3.0.24 zip (win64) from videolan.org into `tools\vlc\`, and create `tools\vlc\portable\`. Its settings and Lua user folder then live there.
-    - Check that it really ignores `%APPDATA%\vlc`.
-    - Fallback: the installed VLC with `--config=<temp vlcrc>`. That still reads Lua scripts from the real `%APPDATA%\vlc\lua`.
-  - **`tests\run-tests.ps1`:**
-    - Copies `lua\` and the test scripts into the portable Lua folder.
-    - Runs VLC with no window: `-I dummy --dummy-quiet --extraintf luaintf --lua-intf <test> --vout dummy --aout dummy`, with a log file.
-    - The test script writes results with `vlc.io.open` and ends with `vlc.misc.quit()`.
-    - The runner reads the results, kills VLC after a timeout, and exits non-zero on failure.
-  - **Test videos (no ffmpeg here):**
-    - Make one tiny video with VLC itself (e.g. 2 s of `screen://`, transcoded small), or another cheap way.
-    - Copy it under many names into `$env:TEMP\vlc-autofolder-tests\` and set LastWriteTime with PowerShell.
-    - Names to cover: Episode 2 / Episode 10, mixed case, spaces, `#` `%` `&` `[ ]` `'` `,`, Unicode (accents, Japanese, emoji).
-    - Also add non-videos (.srt .jpg .txt .nfo), a subfolder with videos (must be ignored), and an .m3u file.
-  - **luacheck:**
-    - `tools\luacheck.exe`, the single Windows binary from github.com/lunarmodules/luacheck releases (MIT).
-    - `.luacheckrc` with `std = "lua51"`, read-only globals `vlc` and `config`, and extension-script globals.
-  - **Spike script** that answers each "Unverified" item. Write the answers into the research file (mark each Measured).
-    - Does `vlc.net` exist in an interface script?
-    - Does `opendir` return `.` and `..`?
-    - Does `stat` work on Unicode and UNC paths?
-    - Does `make_uri` output match VLC's own URIs?
-    - Does `move` around the playing item keep playback and Next/Previous?
-    - Does `luaintf{intf=autofolder}` chain syntax work?
-    - Does `require` work from `lua\intf\modules`?
-    - Does VLC close cleanly while the script waits in `mwait`?
-    - What happens in one-instance mode?
-  - Fill in CLAUDE.md "Build specifics" with the real check commands and times, and docs/local.md with copy-ready commands.
-- **Ask the user:**
-  - Download the portable VLC 3.0.24 zip (~40 MB, estimated) into `tools\` for isolated tests? *Suggested: yes.*
-  - Download `luacheck.exe` into `tools\`? *Suggested: yes.*
-- **Test:**
-  - Claude: luacheck, PSScriptAnalyzer and `tests\run-tests.ps1` all pass; every spike answer is in the research file.
-  - The user: nothing by hand except checking that their normal VLC still behaves as before (nothing is installed yet).
+### 1. Skeleton and API check (medium, built in steps): "Confirm the 3.0.x Lua API details first instead of guessing function names"
+In its own file: [todo/01-skeleton.md](todo/01-skeleton.md) (Approach, answers and Progress list).
 
 ### 2. The interface script (large, built in steps): "When I open any single video, VLC automatically loads every other video in that folder, so Next/Previous work"
 - **Problem / Goal:** spec.md requirements 1–8.

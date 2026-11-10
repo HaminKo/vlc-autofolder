@@ -1,0 +1,81 @@
+# To do 1. Skeleton and API check (medium)
+
+"Confirm the 3.0.x Lua API details first instead of guessing function names"
+
+Built in two steps (one chat each). Moved here from [../todo.md](../todo.md) on 2026-11-10.
+
+- **Problem / Goal:**
+  - The API facts in research/vlc-lua-api.md were read in the 3.0 source but never run.
+  - Every later to-do needs a way to run Lua inside the real VLC 3.0.24 and check the result without touching the user's real VLC settings.
+- **Read first:**
+  - research/vlc-lua-api.md, especially every "Unverified" item.
+  - decisions.md ("Tests run the real VLC").
+- **Approach:**
+  - **Layout** mirrors VLC's folders, so install can copy it as is:
+    - `lua\intf\autofolder.lua`
+    - `lua\intf\modules\` for a helper module, if `require` works there
+    - `lua\extensions\` (To do 3)
+    - `tests\`
+    - `install.ps1` and `uninstall.ps1` at the top level
+  - **Isolated VLC:**
+    - Download the portable VLC 3.0.24 zip (win64) from videolan.org into `tools\vlc\`, and create `tools\vlc\portable\`. Its settings and Lua user folder then live there.
+    - Check that it really ignores `%APPDATA%\vlc`.
+    - Fallback: the installed VLC with `--config=<temp vlcrc>`. That still reads Lua scripts from the real `%APPDATA%\vlc\lua`.
+  - **`tests\run-tests.ps1`:**
+    - Copies `lua\` and the test scripts into the portable Lua folder.
+    - Runs VLC with no window: `-I dummy --dummy-quiet --extraintf luaintf --lua-intf <test> --vout dummy --aout dummy`, with a log file.
+      - **Replaced (step A):** chain syntax instead of `--lua-intf`, so autofolder and a test driver run side by side: `--extraintf "luaintf{intf=autofolder}:luaintf{intf=test_x}"`, plus `--no-one-instance`, `--no-one-instance-when-started-from-file` and `--no-media-library`.
+    - The test script writes results with `vlc.io.open` and ends with `vlc.misc.quit()`.
+    - The runner reads the results, kills VLC after a timeout, and exits non-zero on failure.
+  - **Test videos (no ffmpeg here):**
+    - Make one tiny video with VLC itself (e.g. 2 s of `screen://`, transcoded small), or another cheap way.
+      - **Replaced (step A):** a raw YUV4MPEG2 video written by PowerShell (see decisions.md). `screen://` was rejected: it would record the user's screen.
+    - Copy it under many names into `$env:TEMP\vlc-autofolder-tests\` and set LastWriteTime with PowerShell.
+    - Names to cover: Episode 2 / Episode 10, mixed case, spaces, `#` `%` `&` `[ ]` `'` `,`, Unicode (accents, Japanese, emoji).
+    - Also add non-videos (.srt .jpg .txt .nfo), a subfolder with videos (must be ignored), and an .m3u file.
+  - **luacheck:**
+    - `tools\luacheck.exe`, the single Windows binary from github.com/lunarmodules/luacheck releases (MIT).
+    - `.luacheckrc` with `std = "lua51"`, read-only globals `vlc` and `config`, and extension-script globals.
+  - **Spike script** that answers each "Unverified" item. Write the answers into the research file (mark each Measured).
+    - Does `vlc.net` exist in an interface script?
+    - Does `opendir` return `.` and `..`?
+    - Does `stat` work on Unicode and UNC paths?
+    - Does `make_uri` output match VLC's own URIs?
+    - Does `move` around the playing item keep playback and Next/Previous?
+    - Does `luaintf{intf=autofolder}` chain syntax work?
+    - Does `require` work from `lua\intf\modules`?
+    - Does VLC close cleanly while the script waits in `mwait`?
+    - What happens in one-instance mode?
+  - Fill in CLAUDE.md "Build specifics" with the real check commands and times, and docs/local.md with copy-ready commands.
+- **Ask the user** (answered 2026-11-10: the user went with all suggestions):
+  - Download the portable VLC 3.0.24 zip into `tools\`? **Yes.** It is 82.8 MB (measured), not ~40 MB as first estimated. Rejected: copying the installed VLC folder (ties tests to whatever is installed; others can't reproduce it).
+  - Download `luacheck.exe` v1.2.0 into `tools\`? **Yes.**
+  - A setup script, `tests\setup-tools.ps1`, that downloads both and checks the VLC SHA-256? **Yes**, so `tools\` (gitignored) can be recreated with one command.
+  - The one-instance check needs every other VLC closed for about a minute: it refuses to run while another vlc.exe is open. **Yes.** Regular tests always run with one-instance off.
+  - A real network share for UNC tests? **Not now.** Step B tries `\\localhost\C$`; if Windows blocks it, UNC is checked by hand in To do 5.
+  - Split into two steps? **Yes**, see Progress.
+- **Test:**
+  - Claude: luacheck, PSScriptAnalyzer and `tests\run-tests.ps1` all pass; every spike answer is in the research file.
+  - The user: nothing by hand except checking that their normal VLC still behaves as before (nothing is installed yet).
+
+## Progress
+- [x] **Step A: tools, test runner and skeleton** (done 2026-11-10; tested by the user)
+  - Built:
+    - `tests\setup-tools.ps1`: the portable VLC 3.0.24 zip (from download.videolan.org; SHA-256 pinned) into `tools\vlc\` with `portable\` and a plugin cache, plus `tools\luacheck.exe` v1.2.0 (hash pinned). Downloads go to a temporary name until the hash matches.
+    - `.luacheckrc` (Lua 5.1; `vlc` and `config` read-only; extension globals for `lua/extensions`), and a skeleton `lua\intf\autofolder.lua` (logs `[autofolder] started`, then waits in an `mwait` loop).
+    - `tests\run-tests.ps1`:
+      - Refreshes `tools\vlc\portable\lua\` from `lua\` and `tests\lua\`.
+      - Builds `%TEMP%\vlc-autofolder-tests\media`: 17 videos (Y4M content; date order deliberately not name order; special, Unicode, dot-hidden and attribute-hidden names), 5 non-videos, `Season 2\` subfolder.
+      - Runs each `$cases` entry in a headless VLC (chain syntax, `--no-one-instance`, `--no-media-library`) with a timeout.
+      - Fails on a fail line, a missing "done", a `lua error:` log line (except autofolder's "Interrupted." on close), a missing `LogMustMatch` line, or a change in `%APPDATA%\vlc`.
+    - `tests\lua\intf\modules\testlib.lua` (ok/fail/info/done results file; `check`, `equal`, `sleep`, `wait_for`, `current_item`, `run`) and `test_smoke.lua`.
+  - Answers (measured, in research/vlc-lua-api.md): portable isolation works; chain syntax runs two Lua interfaces side by side; `require` works from `intf\modules`; VLC closes ~0.05 s after quit while a script waits in `mwait` (logging one "Interrupted." error per close); `vlc.io.open` returns no value on failure.
+  - Tests: luacheck and PSScriptAnalyzer clean; run-tests.ps1 passes (~2 s, measured). Negative checks: a crashing autofolder, a driver that never quits (killed at 20 s) and an unwritable results file are each reported as FAIL.
+  - Review (code-review, medium): 10 findings, 8 fixed; left: the Y4M generator's speed (measured 56 ms, not worth it).
+- [ ] **Step B: the API spike** (~300 lines), next
+  - Add each test as a `$cases` entry in run-tests.ps1 plus a driver in `tests\lua\intf\`; the media folder already has every special name.
+  - `test_api.lua`: `vlc.net` present; `opendir` and `.`/`..`; `stat` on Unicode names; `make_uri` against VLC's own URIs for every special name, and decoding back to a path.
+  - `test_move.lua`: enqueue and move items around the playing one; it keeps playing (same id, time not reset); Next/Previous follow the new order.
+  - `tests\spike-one-instance.ps1`, run once: one-instance on/off × enqueue on/off, plus the command Explorer runs on a double-click (read from the registry).
+  - UNC: try `\\localhost\C$`.
+  - Every "Unverified" item in research/vlc-lua-api.md marked Measured or wrong.
