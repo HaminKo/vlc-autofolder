@@ -1,0 +1,9 @@
+# Local notes with this PC's paths (never commit)
+docs/local.md
+.claude/settings.local.json
+
+# Downloaded dev tools (luacheck.exe, portable VLC for tests)
+tools/
+
+# Logs
+*.log
