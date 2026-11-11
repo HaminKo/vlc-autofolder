@@ -1,7 +1,7 @@
 # To-dos
 
 ## Where we are
-- Now: To do 2, step A (trigger, scan, sort, add later files)
+- Now: To do 2, step B (insert earlier files before the playing one)
 - Next: To do 3, 4, 5
 - Updated: 2026-11-11
 
@@ -12,42 +12,7 @@ The requirements are in [spec.md](spec.md), and the API facts and open questions
 ## To do
 
 ### 2. The interface script (large, built in steps): "When I open any single video, VLC automatically loads every other video in that folder, so Next/Previous work"
-- **Problem / Goal:** spec.md requirements 1–8.
-  - Example: double-click `Episode 05.mkv` in a folder of 12 episodes. The playlist becomes Episode 01–12 in sort order, and 05 keeps playing without a restart.
-- **Read first:** spec.md, research/vlc-lua-api.md (playlist and lifecycle sections, To do 1's answers), decisions.md.
-- **Approach:**
-  - `lua\intf\autofolder.lua` polls `vlc.playlist.current()` every ~300 ms with `mwait`, never catching its "Interrupted." error.
-  - It acts only when the id changes to a `file://` item with a video extension.
-  - Pure logic goes in a testable helper module: URI to path, extension filter, natural sort, mtime sort, and the target order.
-  - Build:
-    - List the folder; keep video files only, no subfolders; stat each for mtime; sort (mtime oldest first for now).
-    - Enqueue all missing files in one call.
-    - Look up the new ids with `get("playlist")`.
-    - ~~Move each one into place around the playing item.~~ **Replaced (To do 1 step B):** VLC 3.0's `move` after an item is broken (wrong place or a crash). Files after the playing one: enqueue in order (appended). Files before it: enqueue, then move each to the front of the playlist node, last one first (decisions.md, 2026-11-11).
-  - URI to path: `vlc.strings.make_path` works for local files but drops a UNC server; `make_uri` equals VLC's own URIs (research/vlc-lua-api.md, measured).
-  - State: the active folder, and the ids this script manages.
-  - Log with the prefix `[autofolder]`: `info` for actions, `dbg` for details.
-  - Steps:
-    - A: trigger, scan, sort, add later files.
-    - B: insert earlier files before the playing one.
-    - C: no duplicates, folder switch, guard for playlist files.
-    - D: a 500-file folder without freezing, and UNC paths.
-- **Ask the user:**
-  - A file from a *different* folder starts playing while VLC runs. With default settings this is the common case: Explorer double-clicks reuse the open VLC and append. *Suggested:* remove the previous folder's items this script added, plus the file opened there; keep items you added yourself; then build the new folder.
-  - An .m3u/.xspf or a hand-made mixed playlist is playing. *Suggested:* build only when the playing file is the newest item in the playlist and its folder isn't built yet. Then clicking items in your own playlist does nothing.
-  - A file from the folder that's already loaded is opened again (VLC appends a duplicate). *Suggested:* keep one copy in its correct place, keep it playing, and add any new files that appeared in the folder since.
-  - Hidden files. *Suggested:* skip names starting with `.`. Windows' hidden attribute is **not** visible to Lua (measured in To do 1 step B: `stat` gives the same mode), so attribute-hidden files are included, as when VLC opens a folder itself.
-  - Shuffle is on. *Suggested:* still build in sort order; VLC shuffles anyway.
-- **Test:**
-  - Claude: headless tests per step:
-    - middle, first and last file
-    - Unicode and special names
-    - non-videos and subfolders ignored
-    - clicking within the playlist does nothing
-    - switching folders
-    - duplicate re-open
-    - 500 files (timing measured)
-  - The user: the matching manual checks in the real VLC.
+In its own file: [todo/02-interface-script.md](todo/02-interface-script.md) (Approach, answers and Progress list).
 
 ### 3. Sort-order switch (medium): "Must be switchable without editing code"
 - **Problem / Goal:** sort by date modified (oldest or newest first) or by name with natural sort (Episode 2 before Episode 10). The default is date modified, oldest first.

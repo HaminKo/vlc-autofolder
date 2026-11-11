@@ -2,10 +2,27 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-11: A folder is built only for a file that was just opened
+- **Rule:** the playing item triggers a build only when it was added after the previous file started playing, plays straight away, and is the newest item in the playlist. Playing an item that was already there (a click, Next/Previous, an .m3u's entries, several files opened at once) never builds.
+- **Reason:** the double-click, Open File and drag-onto-window cases all add one item and play it at once; a hand-made playlist must stay as the user made it.
+- **Who:** the user, accepting Claude's suggestion (To do 2 questions).
+- **Rejected:**
+  - "The playing item is the newest one" alone (the to-do's first suggestion): stepping with Next to the last item of a hand-made playlist would build that item's folder and rearrange the list.
+  - "Added since the previous poll": racy, since VLC can add an item and start it hundreds of ms (up to ~6 s, measured in To do 1) apart.
+
+## 2026-11-11: Folder switch, duplicates and deleted files
+- **Rule:**
+  - A file from another folder: remove the old folder's items the script added plus the file opened there; keep the user's own items; build the new folder.
+  - A folder file already in the playlist is never added twice: one copy stays in its place (the playing one, if it's a re-opened duplicate), and files that appeared in the folder since are added.
+  - Items whose file was deleted from the folder are removed when the folder is built again.
+- **Reason:** VLC appends on every double-click and never clears, so without removal the playlist grows without end; spec requirement 7 asks for no duplicates. A deleted file would make VLC show a "can't open" error.
+- **Who:** the user, accepting Claude's suggestions (To do 2 questions).
+- **Rejected:** keeping old folders (the playlist grows; Next runs into the old folder); clearing the whole playlist (it would remove the user's own items).
+
 ## 2026-11-11: The folder logic places files only by moving them to the front of the playlist node
 - **Reason:** VLC 3.0's Lua `playlist.move(id, target)` with an item as target computes the new place from item ids, not positions: wrong places, and a crash when the index falls out of range (measured; research/vlc-lua-api.md, "Playlist"). Moving into the playlist node (the item becomes first) works and keeps playback and Next/Previous right (measured).
 - **How:** enqueue the files after the playing one in order (appended); enqueue the files before it, then move each to the front, last one first.
-- **Who:** Claude, forced by the To do 1 step B measurement; for the user to confirm when To do 2 is built.
+- **Who:** Claude, forced by the To do 1 step B measurement; the user accepted it with the To do 2 plan (2026-11-11).
 - **Rejected:**
   - `move` after an item: wrong place or a crash.
   - `vlc.playlist.sort`: it reorders the user's whole playlist and has no natural or date-modified order.

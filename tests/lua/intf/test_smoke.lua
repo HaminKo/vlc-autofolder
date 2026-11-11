@@ -21,7 +21,7 @@ t.run(function()
     t.check("it is the command-line file", item.path:match("/Episode%%202%.mkv$") ~= nil, item.path)
 
     -- The generated test video really plays (its time moves on). Opening it took
-    -- up to ~3 s on the first runs of a day (measured 2026-11-11), so wait.
-    local time = t.wait_for(function() return t.input_time() > 0 end, 5)
-    t.check("playback time advances", time, "time still 0 after 5 s")
+    -- up to ~8 s on the first run of a day (measured 2026-11-11), so wait.
+    local time = t.wait_for(function() return t.input_time() > 0 end, 10)
+    t.check("playback time advances", time, "time still 0 after 10 s")
 end)

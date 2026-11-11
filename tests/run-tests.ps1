@@ -50,6 +50,29 @@ $cases = @(
     @{
         Name = 'move'; Driver = 'test_move'; Files = @('episode 3.MP4'); TimeoutSec = 40
     }
+    @{
+        # The helper module autofolder_core; no file to play.
+        Name = 'core'; Driver = 'test_core'; Files = @(); TimeoutSec = 20
+    }
+    # Building the folder from the first, a middle and the last video by date (16 videos, the
+    # dot-name not counted), and from the dot-named one, which the scan itself skips.
+    @{
+        Name = 'build-first'; Driver = 'test_build'; Autofolder = $true; Files = @('Episode 10.mkv'); TimeoutSec = 30
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, added 15 after Episode 10\.mkv$')
+    }
+    @{
+        # The Japanese name: Unicode in the opened file and in the files added after it.
+        Name = 'build-middle'; Driver = 'test_build'; Autofolder = $true; Files = @($testVideos[12]); TimeoutSec = 30
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, added 3 after ')
+    }
+    @{
+        Name = 'build-last'; Driver = 'test_build'; Autofolder = $true; Files = @('attribute-hidden.mkv'); TimeoutSec = 30
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, added 0 after attribute-hidden\.mkv$')
+    }
+    @{
+        Name = 'build-dot'; Driver = 'test_build'; Autofolder = $true; Files = @('.dot-hidden.mkv'); TimeoutSec = 30
+        LogMustMatch = @('\[autofolder\] folder .+: 17 videos, added 1 after \.dot-hidden\.mkv$')
+    }
 )
 
 function Invoke-TestCase {
@@ -90,10 +113,11 @@ function Invoke-TestCase {
     elseif ($process.ExitCode -ne 0) { $problems.Add("VLC exit code $($process.ExitCode)") }
     if ($lines -notcontains 'done') { $problems.Add('the driver did not finish (no "done" line)') }
     foreach ($line in $lines) { if ($line -like 'fail *') { $problems.Add($line) } }
-    # A Lua error in any script, except the "Interrupted." that ends autofolder when VLC closes.
-    # (Drivers quit VLC themselves, so they are never interrupted in a passing case.)
+    # A Lua error in any script, except the "Interrupted." that ends a script when VLC closes:
+    # autofolder's, and the driver's in testlib's quit loop (a driver interrupted before it
+    # finished has no "done" line, which fails above).
     foreach ($line in $logLines) {
-        if ($line -like 'lua error:*' -and $line -notmatch 'autofolder\.lua:\d+: Interrupted\.$') {
+        if ($line -like 'lua error:*' -and $line -notmatch '(autofolder|testlib)\.lua:\d+: Interrupted\.$') {
             $problems.Add("log: $line")
         }
     }

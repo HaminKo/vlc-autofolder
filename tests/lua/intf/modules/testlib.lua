@@ -126,7 +126,8 @@ function M.playlist_names()
 end
 
 -- Runs the test body, records an uncaught error as a failure, writes "done"
--- and quits VLC.
+-- and quits VLC. It never returns: VLC's closing interrupts its last wait,
+-- and that "Interrupted." error ends the script (run-tests.ps1 allows it).
 function M.run(body)
     local ok, err = pcall(body)
     if not ok and tostring(err):find("Interrupted%.") then
@@ -143,9 +144,15 @@ function M.run(body)
         write("done")
         out:close()
     end)
-    vlc.misc.quit()
     if not wrote then
-        error(write_err, 0)
+        vlc.msg.err(tostring(write_err))
+    end
+    -- A quit is lost when it comes before vlc.exe has set its exit handler:
+    -- a driver that quit 0.1 s after start left VLC running in 5 of 6 runs
+    -- (measured 2026-11-11). So quit again every 0.5 s until VLC closes.
+    while true do
+        vlc.misc.quit()
+        vlc.misc.mwait(vlc.misc.mdate() + 500000)
     end
 end
 

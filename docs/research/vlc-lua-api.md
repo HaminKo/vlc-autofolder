@@ -25,6 +25,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
 - **No `vlc.misc.should_die` in 3.0.** `vlc.misc` has only `version`, `copyright`, `license`, `action_id`, `mdate`, `mwait` and `quit`. **Measured 2026-11-11:** `vlc.misc.should_die` is nil.
 - **`vlc.misc.mwait(t)`** waits until the absolute time `t` (microseconds, compare `vlc.misc.mdate()`). The wait can be interrupted, and then it raises the Lua error `"Interrupted."`.
 - **Exit:** `Close_LuaIntf` interrupts the script's waits (`vlclua_fd_interrupt`), then joins the thread. So the script ends when `mwait` raises "Interrupted.", and **the main loop must not catch that error** (no `pcall` around `mwait`). A script stuck in a pure Lua loop would probably block VLC from closing. **Measured 2026-11-10: clean.** After `vlc.misc.quit()`, a script waiting in an `mwait` loop ends at once; VLC exited ~0.05 s later with exit code 0. VLC logs this at error level on every close, e.g. `lua error: Error loading script C:\...\lua\intf\autofolder.lua: ...autofolder.lua:17: Interrupted.`, so Tools → Messages shows one such error per close: expected, not a bug.
+- **An early `vlc.misc.quit()` is lost (measured 2026-11-11, To do 2 step A).** Extra interfaces start inside `libvlc_new`, before vlc.exe sets its exit handler (in 3.0 source, `libvlc_wait` sets it). A quit before that only logs `main debug: no exit handler`, and VLC keeps running. A test driver that quit 0.1 s after start left VLC running in 5 of 6 runs; quitting again every 0.5 s until VLC closes fixed it (6 of 6; the log showed two lost quits). The test library does this now. autofolder never quits VLC, so it isn't affected.
 - **Libraries** opened for interface scripts: the standard Lua libraries, plus `config`, `httpd`, `input`, `msg`, `misc`, `object`, `osd`, `playlist`, `sd_intf`, `stream`, `strings`, `variables`, `video`, `vlm`, `volume`, `gettext`, `xml`, `equalizer`, `io` (vlcio), `errno`, the fd/net functions, and `win` on Windows.
   - **Measured 2026-11-10:** `vlc.net` and `vlc.io` are tables in an interface script. ~~Unverified until To do 1 step B: that `stat` and `opendir` work there.~~ **Measured 2026-11-11: they work** (tests\lua\intf\test_api.lua; details under "Files and folders"). The README says the net namespace is usable "for interfaces and extensions".
 - No change callbacks: `vlc.var.add_callback` is not in the 3.0 README (only `var.trigger_callback`). The script must **poll**, e.g. `vlc.playlist.current()` every 300–500 ms. **Measured 2026-11-11:** `vlc.var.add_callback` is nil.
@@ -78,6 +79,9 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
 ## Playlist (source: libs/playlist.c, README)
 - Registered: `prev`, `next`, `skip`, `play`, `pause`, `stop`, `clear`, `repeat`/`repeat_`, `loop`, `random`, `goto` (Lua < 5.2 only, so present here), `gotoitem`, `add`, `enqueue`, `get`, `search`, `current`, `sort`, `status`, `delete`, `move`.
 - **`current()`** returns the playing item's id, or -1.
+  - **Measured 2026-11-11 (To do 2 step A):** it returns the new item's id **before VLC creates that item's input**: autofolder's build log line came before `Creating an input for 'Episode 2.mkv'`. So the folder is built while the opened file is still opening.
+- **`gotoitem(id)`** plays the item with that id (measured 2026-11-11, test_build.lua).
+- `nb_played` is 1 for an item that has started once (measured 2026-11-11, test_build.lua).
 - **`add(items)` / `enqueue(items)`**
   - Each item is a table with `path` (a URI), `name`, `options`, and more.
   - They append with `playlist_AddInput`; `add` also plays, `enqueue` doesn't.
@@ -100,6 +104,8 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
     - Next and Previous follow the new order.
     - Moving the playing item itself to the front also keeps it playing, and Next then follows the new order.
 - `auto-preparse=1` (default) makes VLC read metadata of every added item. With hundreds of files, especially on a network share, that is background work to watch in To do 2.
+  - **Measured 2026-11-11 (To do 2 step A):** after `enqueue`, the log shows `Creating an input for preparsing '<name>'` for each added item, one after another, interleaved with the opening of the playing file.
+  - On the first test run of the day, the smoke case's Episode 2.mkv (14 files added) took more than 5 s to show its first picture; three warm runs right after took 1.2 s per case. Whether the preparsing slows a cold start is **not measured** (one cold run only; cold opens of 7.9 s were measured before any files were added). To check in step D, with a large folder.
 - **Opening a folder** (an item whose URI is a folder; measured 2026-11-11):
   - When played, VLC's `directory` module replaces the folder item **in place with a flat list** of its entries (the default `playlist-tree` is off). A subfolder becomes one item, expanded the same way when it plays.
   - The subfolder came first, before names that sort ahead of it. The non-video files of the test folder (`.srt`, `.jpg`, `.txt`, `.nfo`, `.m3u`) and the dot-name `.dot-hidden.mkv` are left out; the attribute-hidden file is kept.
@@ -155,6 +161,7 @@ Found in To do 1 step B (measured 2026-11-11):
 - **Crash dumps ignore the portable folder.** When the test VLC crashed, `vlc.exe` wrote `crashdump\<id>.dmp` into the real `%APPDATA%\vlc` (path from `SHGetFolderPathW`). A VLC with crash handling on checks that folder at its next start and asks to send the report. `vlc.exe` itself reads `--no-crashdump` (the string is in vlc.exe; the option isn't passed on to libvlc), and with it a crashing test VLC left `%APPDATA%\vlc` unchanged (measured). All test VLCs pass it now. The one dump written before the fix was moved out of `%APPDATA%\vlc` by hand.
 - The first two test runs of a day were slow: opening the test video took 7.9 s and 3.5 s, later runs ~1.2 s per case (cause not checked; probably Windows scanning the plugin DLLs again). The smoke test now waits up to 5 s for playback instead of a fixed 1 s.
 - Timing of the 3 cases (smoke, api, move): ~8 s per run (three runs in a row).
+- Timing of the 8 cases after To do 2 step A: ~20 s per run (measured 2026-11-11, warm).
 
 ## Prior art (searched 2026-11-10)
 - No ready-made auto-starting interface script for VLC 3 was found.
