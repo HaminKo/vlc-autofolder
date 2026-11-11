@@ -38,6 +38,8 @@ $ErrorActionPreference = 'Stop'
 #   LogMustMatch: regexes that must each match a line of VLC's log.
 #   LogMustNotMatch: regexes that no line of VLC's log may match.
 #   Config:       more fields for the driver's config table, in Lua syntax (e.g. "open=[[a.mkv]]").
+#   Big:          needs the 500-video folder ($bigFolder), made only when such a case runs.
+#   Unc:          needs $uncMedia (the admin share C$); skipped, not failed, when it can't be reached.
 # The driver's config table (lua-config) holds: out (its results file), media (the media
 # folder), videos (the video list file, oldest first) and unc (the media folder as a UNC path).
 $cases = @(
@@ -61,20 +63,20 @@ $cases = @(
     # counts are the fewest moves to the front for each case.
     @{
         Name = 'build-first'; Driver = 'test_build'; Autofolder = $true; Files = @('Episode 10.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 0 before and 15 after Episode 10\.mkv; added 15, removed 0; 0 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 0 before and 15 after Episode 10\.mkv; added 15, removed 0; 0 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         # The Japanese name: Unicode in the opened file and in the files added around it.
         Name = 'build-middle'; Driver = 'test_build'; Autofolder = $true; Files = @($testVideos[12]); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 12 before and 3 after .+; added 15, removed 0; 12 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 12 before and 3 after .+; added 15, removed 0; 12 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         Name = 'build-last'; Driver = 'test_build'; Autofolder = $true; Files = @('attribute-hidden.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 15 before and 0 after attribute-hidden\.mkv; added 15, removed 0; 15 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 15 before and 0 after attribute-hidden\.mkv; added 15, removed 0; 15 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         Name = 'build-dot'; Driver = 'test_build'; Autofolder = $true; Files = @('.dot-hidden.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 17 videos, 15 before and 1 after \.dot-hidden\.mkv; added 16, removed 0; 15 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 17 videos, 15 before and 1 after \.dot-hidden\.mkv; added 16, removed 0; 15 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         # A running VLC: the user's own item (a video in another folder) is in the playlist, then a
@@ -82,25 +84,36 @@ $cases = @(
         # the user's item afterwards builds nothing.
         Name = 'build-user'; Driver = 'test_build'; Autofolder = $true; Files = @(); TimeoutSec = 30
         Config = 'user=[[{0}]],open=[[Episode 1.mkv]]' -f (Join-Path $testRoot 'summer.mkv')
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, removed 0; 3 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, removed 0; 3 moves; \d+ ms \(scan \d+ ms\)$')
         LogMustNotMatch = @('\[autofolder\] left folder')
+    }
+    @{
+        # Through a UNC path (\\127.0.0.1\C$\...): the folder is read and built through the share.
+        Name = 'build-unc'; Driver = 'test_build'; Autofolder = $true; Unc = $true; Files = @(Join-Path $uncMedia 'Episode 2.mkv'); TimeoutSec = 30
+        LogMustMatch = @('\[autofolder\] folder \\\\127\.0\.0\.1\\.+\\media\\: 16 videos, 1 before and 14 after Episode 2\.mkv; added 15, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$')
+    }
+    @{
+        # 500 videos. The one opened is the last by date, so all 499 others are moved before it.
+        Name = 'build-big'; Driver = 'test_big'; Autofolder = $true; Big = $true; Files = @(Join-Path $bigFolder $bigVideos[-1]); TimeoutSec = 40
+        Config = 'list=[[{0}]]' -f $bigList
+        LogMustMatch = @('\[autofolder\] folder .+\\big\\: 500 videos, 499 before and 0 after {0}; added 499, removed 0; 499 moves; \d+ ms \(scan \d+ ms\)$' -f [regex]::Escape($bigVideos[-1]))
     }
     # The playlist rules (test_rules.lua describes each scenario).
     @{
         Name = 'rules-switch'; Driver = 'test_rules'; Autofolder = $true; Files = @(); TimeoutSec = 40
         Config = 'scenario=[[switch]]'
         LogMustMatch = @(
-            '\[autofolder\] folder .+\\media\\: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, removed 1; 3 moves$'
+            '\[autofolder\] folder .+\\media\\: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, removed 1; 3 moves; \d+ ms \(scan \d+ ms\)$'
             '\[autofolder\] left folder .+\\media\\: removed 15 items$'
-            '\[autofolder\] folder .+\\Season 2\\: 2 videos, 0 before and 1 after Episode 1\.mkv; added 1, removed 0; 0 moves$'
+            '\[autofolder\] folder .+\\Season 2\\: 2 videos, 0 before and 1 after Episode 1\.mkv; added 1, removed 0; 0 moves; \d+ ms \(scan \d+ ms\)$'
         )
     }
     @{
         Name = 'rules-refresh'; Driver = 'test_rules'; Autofolder = $true; Files = @(); TimeoutSec = 40
         Config = 'scenario=[[refresh]]'
         LogMustMatch = @(
-            '\[autofolder\] folder .+\\refresh\\: 3 videos, 1 before and 1 after b\.mkv; added 2, removed 0; 1 moves$'
-            '\[autofolder\] folder .+\\refresh\\: 3 videos, 0 before and 2 after a\.mkv; added 1, removed 2; 1 moves$'
+            '\[autofolder\] folder .+\\refresh\\: 3 videos, 1 before and 1 after b\.mkv; added 2, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$'
+            '\[autofolder\] folder .+\\refresh\\: 3 videos, 0 before and 2 after a\.mkv; added 1, removed 2; 1 moves; \d+ ms \(scan \d+ ms\)$'
         )
         LogMustNotMatch = @('\[autofolder\] left folder')
     }
@@ -209,9 +222,15 @@ $total = [Diagnostics.Stopwatch]::StartNew()
 $userVlcBefore = Get-FolderSnapshot $userVlc
 Initialize-PortableLua
 Initialize-TestFolder
+if ($selected | Where-Object { $_.Big }) { Initialize-BigFolder }
 
 $failed = 0
 foreach ($spec in $selected) {
+    if ($spec.Unc -and -not (Test-Path -LiteralPath $uncMedia)) {
+        # E.g. the admin share is off, or the account isn't a local administrator.
+        Write-Host "SKIP $($spec.Name): $uncMedia can't be reached" -ForegroundColor Yellow
+        continue
+    }
     if (-not (Invoke-TestCase $spec)) { $failed++ }
 }
 

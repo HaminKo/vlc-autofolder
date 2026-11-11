@@ -138,8 +138,46 @@ Built in four steps (one chat each). Moved here from [../todo.md](../todo.md) on
     - Left: an item whose file `stat` can't find is removed even if the user added it (the decision); nested items with `playlist-tree` on aren't matched (research note).
     - Moved to step D: the playlist read on every poll and the ~5 reads per build.
   - Next: step D, a 500-file folder and UNC paths.
-- [ ] **Step D: a 500-file folder without freezing, and UNC paths** (~150 lines)
-  - Timing measured; if VLC stalls, spread the work over several polls. UNC via `\\localhost\C$`; the effect of `auto-preparse` on hundreds of items.
-  - A folder that can't be read (a share that is briefly offline) is only logged, not retried; decide whether to retry it.
-  - Also measure whether the build slows the start of the opened file: the build runs before VLC creates its input, and the preparsing of the added files runs alongside the opening (step A finding, research/vlc-lua-api.md "Playlist"). If it does, build only once the opened file plays.
-  - From the step C review: since step C, every poll reads the whole playlist (`get("playlist")`, to see how long the last item has been last), and a build reads it about 5 times (match, managed cleanup, enqueue twice, arrange). Measure both with a 500-item playlist; pass the item list along if it matters.
+- [x] **Step D: a 500-file folder without freezing, and UNC paths** (done 2026-11-11; tested by the user)
+  - Planned ~150 lines; built ~200 (code ~15, tests ~185), plus docs.
+  - Measured first with a throwaway spike (a timed copy of autofolder in the headless test VLC, 500 short videos); the numbers are in research/vlc-lua-api.md, "Large folders".
+    - 500 local files build in 37–54 ms; 499 moves take 1–2 ms. Other playlist calls never waited more than 3 ms.
+    - The opened file's first picture came no later than without autofolder.
+    - A playlist read with 500 items takes ~1 ms.
+    - Through a share: the scan took ~0.9 s, and preparsing ran at ~12 files/s, without affecting playback.
+  - Found:
+    - VLC 3.0.24 can't open `\\localhost\...` files. It takes `file://localhost/` as this PC and drops the server.
+    - `make_path` drops only `localhost`, not every UNC server: the old research note was wrong in general and is now marked.
+    - The tests' UNC path is now `\\127.0.0.1\C$`.
+    - `vlc.misc.mdate` counts in 1 ms steps on Windows.
+    - A cold VLC start without autofolder had no first picture within 15 s, so cold slowness is VLC's own.
+  - Choices (the user, step D questions; decisions.md, "A build runs whole and at once"):
+    - The build runs whole, in one poll, at once.
+    - A folder that can't be read is logged, not retried.
+    - The playlist reads stay as they were.
+    - Preparsing is left on.
+    - No 500-file UNC case in the tests.
+  - Built:
+    - `autofolder.lua`: the build line ends with its time and the scan's (`; 499 moves; 45 ms (scan 27 ms)`); the "cannot read the folder" warning gives its time and says to open the file again.
+    - Tests:
+      - `TestCommon.ps1`: `$uncMedia` through `\\127.0.0.1`; `Initialize-BigFolder` (500 videos of 30 s, dated in a different order than their names), made only for a case marked `Big`.
+      - `run-tests.ps1`: cases build-unc (marked `Unc`: skipped when the admin share can't be reached) and build-big; the build patterns include the time.
+      - New driver `test_big.lua`: the order within 5 s, no playlist call waiting over 250 ms, the file still playing and started once; timings as info lines.
+      - `test_api.lua`: `make_path` keeps a real server and drops `localhost`.
+  - Tests:
+    - luacheck and PSScriptAnalyzer clean; run-tests.ps1 passes, 16 cases in 65.7 s and 65.1 s (measured).
+    - build-big: in order 540 ms after the file started, longest playlist wait 1–2 ms.
+    - The user, in the portable test VLC with a window, passed:
+      - The 500-file folder: the right order, the newest file playing, the window responsive while the lengths filled in; Previous right; one build line.
+      - The same through `\\127.0.0.1\C$`: lengths filled in slowly, as expected.
+    - Skipped by the user: a real network share (To do 5's checklist has it).
+  - Review (code-review, medium): 7 findings.
+    - Fixed:
+      - build-unc failed outright without the admin share.
+      - The scan-failure warning had no time.
+      - testlib's header still named `\\localhost`.
+      - The wording of the latency check and of the timing resolution.
+    - Left:
+      - A `\\localhost` file still gets its folder built, though VLC can't play any of it; rare, and in the README limitations.
+      - The struck-out research line keeps its conclusion, which still holds.
+  - To do 2 is finished. Next: To do 3, the sort-order switch.

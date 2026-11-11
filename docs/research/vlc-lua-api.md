@@ -39,6 +39,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
   - So `modification_time` exists in 3.0.
   - **Measured 2026-11-11** (Windows 11, NTFS, test_api.lua):
     - Works on Unicode names (é, Japanese, an emoji outside the BMP) and on UNC paths (`\\localhost\C$\...`, same times as the local path). Only the local admin share was tried; a real network share is a manual check (To do 5).
+    - **Through a share it's much slower (measured 2026-11-11, To do 2 step D):** listing and `stat`-ing 500 files took 22–32 ms on the local disk and 757–875 ms through `\\localhost\C$` and `\\127.0.0.1\C$` (one run each), so ~1.5 ms per file even with no network in between. A real network share will be slower (not measured).
     - `modification_time` is the true Unix time: it matched the dates the test runner set, for a January file and for a July file (summer time, Eastern time zone). So no DST shift from the old MSVCRT `stat`.
     - `type` is `"file"` or `"dir"`; `size` is in bytes; `uid` and `gid` are 0.
     - `mode` is 33206 (octal 100666) for a file and 16895 (octal 40777) for a folder. A file with Windows' **hidden attribute has the same mode**: Lua can't see that attribute.
@@ -65,7 +66,9 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
 - `vlc.strings.make_uri(path, [scheme])` converts a path to a URI.
 - `vlc.strings.decode_uri(...)` and `vlc.strings.encode_uri_component(...)` decode and encode URIs.
 - **No `vlc.strings.make_path` in the 3.0 README.** To get a local path from `file:///C:/...` the script must decode the URI and convert it itself.
-  - **Wrong, measured 2026-11-11:** `vlc.strings.make_path` exists in 3.0.24, although the README leaves it out. It gives back every local path exactly (all 17 test names), but **drops the server of a UNC path**: `file://localhost/C%24/Users/...` becomes `C$\Users\...`. So for UNC the script still converts itself.
+  - **Wrong, measured 2026-11-11:** `vlc.strings.make_path` exists in 3.0.24, although the README leaves it out. It gives back every local path exactly (all 17 test names), but ~~**drops the server of a UNC path**~~: `file://localhost/C%24/Users/...` becomes `C$\Users\...`. So for UNC the script still converts itself.
+    - **Corrected, measured 2026-11-11 (To do 2 step D):** it drops only the server **`localhost`**, which VLC takes as "this PC". `file://127.0.0.1/C%24/...` and `file://<computer name>/C%24/...` come back as `\\127.0.0.1\C$\...` and `\\<computer name>\C$\...`. autofolder keeps its own conversion (`core.uri_to_path`, tested); it keeps every server.
+    - **VLC itself can't open a `\\localhost\...` file** (measured, same step): VLC turns `file://localhost/C%24/...` into the path `C$\Users\...` and fails (`filesystem error: cannot open file C$\Users\...`, then "Your input can't be opened"). A real server name plays. That's why the tests use `\\127.0.0.1\C$\...` for UNC since step D; with `\\localhost` the step D spike's UNC build test failed on Previous and clicks, because no item could play.
   - UNC paths arrive as `file://server/share/...`.
   - ~~Unverified: what `make_uri` produces for a UNC path and for names with `#`, `%`, `[`, `]` or Unicode.~~ **Measured 2026-11-11** (test_api.lua):
     - `make_uri` gives **exactly the URIs VLC makes itself**, for all 17 test names: from the command line (that is, Explorer) and from opening a folder. So URIs can be compared as strings, as long as both come from VLC.
@@ -109,10 +112,18 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
     - The playing item keeps playing: same id, and the time doesn't go back.
     - Next and Previous follow the new order.
     - Moving the playing item itself to the front also keeps it playing, and Next then follows the new order.
-    - **Also during a build (measured 2026-11-11, To do 2 step B, test_build.lua):** 0 to 15 moves in the same poll as the enqueue, right as the opened file starts. In all 5 cases the opened file kept its id, was started once (`nb_played` 1), and Previous played the file before it. Not measured: whether the Qt playlist view shows the new order at once (manual test), and the time for hundreds of moves (step D).
+    - **Also during a build (measured 2026-11-11, To do 2 step B, test_build.lua):** 0 to 15 moves in the same poll as the enqueue, right as the opened file starts. In all 5 cases the opened file kept its id, was started once (`nb_played` 1), and Previous played the file before it. Not measured: whether the Qt playlist view shows the new order at once (manual test), and ~~the time for hundreds of moves (step D)~~ (measured: 499 moves take 1–2 ms, see "Large folders" below).
 - `auto-preparse=1` (default) makes VLC read metadata of every added item. With hundreds of files, especially on a network share, that is background work to watch in To do 2.
   - **Measured 2026-11-11 (To do 2 step A):** after `enqueue`, the log shows `Creating an input for preparsing '<name>'` for each added item, one after another, interleaved with the opening of the playing file.
   - On the first test run of the day, the smoke case's Episode 2.mkv (14 files added) took more than 5 s to show its first picture; three warm runs right after took 1.2 s per case. Whether the preparsing slows a cold start is **not measured** (one cold run only; cold opens of 7.9 s were measured before any files were added). To check in step D, with a large folder.
+    - **Measured in step D (below):** warm, the build doesn't measurably delay the opened file. Cold, the step D spike's first VLC start had no first picture within 15 s **without autofolder loaded** (one run), so the cold-start slowness is VLC's own.
+- **Large folders (measured 2026-11-11, To do 2 step D;** a throwaway spike, then the `build-big` case). A folder of 500 short videos in the headless test VLC, with the opened file the last by date, so 499 files are added and all moved before it. Timings come from `vlc.misc.mdate`, which counts in **1 ms steps** on Windows (every timing came out in whole ms). 1–2 runs each, warm:
+  - The build: 37–54 ms in all. Listing and `stat`: 22–32 ms; one `enqueue` of 499 items: 10–17 ms; **499 moves to the front: 1–2 ms**. The playlist was complete and in order at the measuring script's first or second check (every 250 ms): 0.27–0.54 s after VLC started, the file having started 0.02–0.04 s after VLC. So the folder is in place within one or two of autofolder's 300 ms polls.
+  - Another script calling `vlc.playlist.current()` every 20 ms never waited more than 3 ms, during the build or the preparsing after it. So the build doesn't hold the playlist long enough to freeze anything; the Qt window itself is a manual check.
+  - **The opened file starts no later:** first picture 0.99–1.01 s after start with the build, 0.98–0.99 s without autofolder (the test video has 1 frame/s, so this counts from the first frame after 0). Through UNC: 1.13 s both ways. Playback then kept pace with the clock.
+  - `get("playlist")` with 500 items: 0.6–1.3 ms per read, at most 3 ms. autofolder reads it once per 300 ms poll and ~5 times per build: not worth avoiding.
+  - **Preparsing:** all 500 items were preparsed within 3.7–3.9 s on the local disk. Through `\\127.0.0.1\C$`, only 352 of 500 after 29 s (~12 per second), still going when the run ended; playback wasn't affected. VLC preparses the same way when it opens a folder itself. With `--no-auto-preparse` the build took the same time and no preparse inputs were created.
+  - Through UNC (`\\127.0.0.1\C$`): the build took 899 ms, 875 of them the scan; the folder was in order at the check 1.07 s after VLC started.
 - **Opening a folder** (an item whose URI is a folder; measured 2026-11-11):
   - When played, VLC's `directory` module replaces the folder item **in place with a flat list** of its entries (the default `playlist-tree` is off). A subfolder becomes one item, expanded the same way when it plays.
   - The subfolder came first, before names that sort ahead of it. The non-video files of the test folder (`.srt`, `.jpg`, `.txt`, `.nfo`, `.m3u`) and the dot-name `.dot-hidden.mkv` are left out; the attribute-hidden file is kept.
@@ -171,6 +182,7 @@ Found in To do 1 step B (measured 2026-11-11):
 - The first two test runs of a day were slow: opening the test video took 7.9 s and 3.5 s, later runs ~1.2 s per case (cause not checked; probably Windows scanning the plugin DLLs again). The smoke test now waits up to 5 s for playback instead of a fixed 1 s.
 - Timing of the 3 cases (smoke, api, move): ~8 s per run (three runs in a row).
 - Timing of the 8 cases after To do 2 step A: ~20 s per run (measured 2026-11-11, warm).
+- Timing of the 16 cases after To do 2 step D: 65.7 s (one run, measured 2026-11-11); `build-big` takes 2.7 s, plus 0.6–0.8 s to make its 500 files (measured in the spike).
 
 ## Prior art (searched 2026-11-10)
 - No ready-made auto-starting interface script for VLC 3 was found.

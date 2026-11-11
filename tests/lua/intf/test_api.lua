@@ -22,7 +22,7 @@ local function contains(list, value)
 end
 
 -- A file URI back to a Windows path, UNC included (vlc.strings.make_path drops
--- the server of a UNC path; see below). nil for other URIs.
+-- the server localhost; see below). nil for other URIs.
 local function uri_to_path(uri)
     local decoded = vlc.strings.decode_uri(uri)
     local rest = decoded:match("^file:///(.*)$")
@@ -178,8 +178,12 @@ t.run(function()
     t.check("make_path gives back every local path", #make_path_wrong == 0, table.concat(make_path_wrong, " | "))
     local unc_file = config.unc .. "\\Episode 1.mkv"
     local unc_back = vlc.strings.make_path(vlc.strings.make_uri(unc_file))
-    t.check("make_path drops the server of a UNC path (measured 2026-11-11)",
-        unc_back == unc_file:gsub("^\\\\[^\\]+\\", ""), tostring(unc_back))
+    t.equal("make_path keeps the server of a UNC path", unc_back, unc_file)
+    -- The server "localhost" counts as this PC: make_path drops it, and VLC
+    -- can't open such a file either (measured 2026-11-11, To do 2 step D).
+    local localhost_file = unc_file:gsub("^\\\\[^\\]+\\", "\\\\localhost\\")
+    t.equal("make_path drops the server localhost",
+        vlc.strings.make_path(vlc.strings.make_uri(localhost_file)), (unc_file:gsub("^\\\\[^\\]+\\", "")))
 
     -- UNC
     local unc_uri = vlc.strings.make_uri(unc_file)

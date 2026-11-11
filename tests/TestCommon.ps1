@@ -19,8 +19,10 @@ $vlcExe = Join-Path $root 'tools\vlc\vlc.exe'
 $portable = Join-Path $root 'tools\vlc\portable'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) 'vlc-autofolder-tests'
 $media = Join-Path $testRoot 'media'
-# The media folder as a UNC path through the admin share, e.g. \\localhost\C$\Users\...\media.
-$uncMedia = '\\localhost\{0}${1}' -f $media.Substring(0, 1), $media.Substring(2)
+# The media folder as a UNC path through the admin share, e.g. \\127.0.0.1\C$\Users\...\media.
+# Not \\localhost: VLC 3.0 takes file://localhost/ as this PC, drops the server and can't open
+# the file (measured 2026-11-11).
+$uncMedia = '\\127.0.0.1\{0}${1}' -f $media.Substring(0, 1), $media.Substring(2)
 # Written by Initialize-TestFolder: the video names, oldest first, one per line (UTF-8).
 $videoList = Join-Path $testRoot 'videos.txt'
 # VLC finds %APPDATA% through the shell API, not the environment variable.
@@ -48,6 +50,15 @@ $testVideos = @(
     '.dot-hidden.mkv'
     'attribute-hidden.mkv'
 )
+
+# A large folder (Initialize-BigFolder): 500 videos, $bigVideos oldest first. Name number n is
+# the ((n - 1) * 37 mod 500)-th by date, so the date order is far from the name order.
+$bigFolder = Join-Path $testRoot 'big'
+$bigList = Join-Path $testRoot 'big.txt'  # $bigVideos, one per line (UTF-8)
+$bigVideos = New-Object 'string[]' 500
+for ($i = 0; $i -lt $bigVideos.Length; $i++) {
+    $bigVideos[($i * 37) % $bigVideos.Length] = 'Show S01E{0:000}.mkv' -f ($i + 1)
+}
 
 function Assert-TestVlc {
     # Throws unless the test VLC exists and no copy of it is running.
@@ -80,16 +91,17 @@ function Get-HeadlessVlcArgumentList {
 }
 
 function Get-Y4mVideo {
-    # A 2-minute, 32x32, 1 frame/s raw video (YUV4MPEG2). VLC plays it whatever the file
-    # extension (its avcodec demuxer detects the format), so it serves as .mkv, .mp4, ...
-    $w = 32; $h = 32; $frames = 120
+    # A 32x32, 1 frame/s raw video (YUV4MPEG2), $Frames seconds long. VLC plays it whatever
+    # the file extension (its avcodec demuxer detects the format), so it serves as .mkv, .mp4, ...
+    param([int]$Frames = 120)
+    $w = 32; $h = 32
     $stream = New-Object IO.MemoryStream
     $header = [Text.Encoding]::ASCII.GetBytes("YUV4MPEG2 W$w H$h F1:1 Ip A1:1 C420jpeg`n")
     $stream.Write($header, 0, $header.Length)
     $frameHeader = [Text.Encoding]::ASCII.GetBytes("FRAME`n")
     $frame = New-Object byte[] ($w * $h * 3 / 2)
     for ($i = $w * $h; $i -lt $frame.Length; $i++) { $frame[$i] = 128 }  # grey chroma
-    for ($n = 0; $n -lt $frames; $n++) {
+    for ($n = 0; $n -lt $Frames; $n++) {
         for ($i = 0; $i -lt $w * $h; $i++) { $frame[$i] = [byte](($n * 2) % 256) }  # brightness ramp
         $stream.Write($frameHeader, 0, $frameHeader.Length)
         $stream.Write($frame, 0, $frame.Length)
@@ -151,6 +163,22 @@ function Initialize-TestFolder {
     $summer = Join-Path $testRoot 'summer.mkv'
     [IO.File]::WriteAllBytes($summer, $video)
     [IO.File]::SetLastWriteTime($summer, (New-Object DateTime 2026, 7, 1, 12, 0, 0))
+}
+
+function Initialize-BigFolder {
+    # $bigVideos as 30-second videos (~45 KB each), 1 minute apart from 2025-01-01 12:00 local
+    # time, and $bigList. Only for the cases that need it (0.6-0.8 s, measured). Call it after
+    # Initialize-TestFolder, which empties the test folder.
+    New-Item -ItemType Directory -Force -Path $bigFolder | Out-Null
+    $video = Get-Y4mVideo -Frames 30
+    $time = New-Object DateTime 2025, 1, 1, 12, 0, 0
+    foreach ($name in $bigVideos) {
+        $path = Join-Path $bigFolder $name
+        [IO.File]::WriteAllBytes($path, $video)
+        [IO.File]::SetLastWriteTime($path, $time)
+        $time = $time.AddMinutes(1)
+    }
+    [IO.File]::WriteAllText($bigList, (($bigVideos -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
 }
 
 function Initialize-PortableLua {

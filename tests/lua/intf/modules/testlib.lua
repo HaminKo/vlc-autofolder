@@ -7,7 +7,8 @@ headless VLC. Its global `config` comes from the lua-config setting:
     config.out     the results file to write
     config.media   the test media folder
     config.videos  a file listing the test videos, oldest first (read_lines)
-    config.unc     the media folder as a UNC path (\\localhost\C$\...)
+    config.unc     the media folder as a UNC path (\\127.0.0.1\C$\...; VLC
+                   can't open \\localhost paths)
 
 Results file, one line each:
     ok NAME | fail NAME: MESSAGE | info TEXT | done

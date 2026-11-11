@@ -2,6 +2,26 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-11: A build runs whole and at once; a folder that can't be read is not retried
+- **Rule:**
+  - The build runs in one poll, as soon as the opened file is seen, also for hundreds of files and on network shares.
+  - A folder that can't be read is logged as a warning that says to open the file again; no retry.
+  - The playlist is read once per poll and ~5 times per build, as before.
+  - The build line in the log gives its time and the scan's share of it.
+- **Reason (measured, research/vlc-lua-api.md "Large folders"):**
+  - 500 local files build in 37–54 ms (499 moves: 1–2 ms), and other playlist calls never waited more than 3 ms.
+  - The opened file's first picture came no later than without autofolder.
+  - A playlist read with 500 items costs ~1 ms.
+  - If the share is offline, the opened file can't play either, and opening the file again rebuilds anyway, since it is "just opened".
+- **Who:** the user, accepting Claude's suggestions (To do 2 step D questions).
+- **Rejected:**
+  - Spreading the build over several polls: nothing waits on it, and the folder would come later.
+  - Building only once the opened file plays: no measured gain, and a later folder.
+  - A retry loop (e.g. every second for 10 s while the file plays): more state for a rare case.
+  - Turning preparsing off for the added files (how, from Lua, wasn't looked into): VLC preparses a folder it opens itself the same way. Over a share it's slow (~12 files/s through a local test share), but playback wasn't affected. Without it, the playlist would probably show no durations until each file plays (not checked).
+  - Passing one playlist read along through the build: it saves ~4 ms of a 45 ms build.
+  - Skipping the playlist read on polls where nothing started: it saves ~1 ms per 300 ms, and the read tells when the last item changed.
+
 ## 2026-11-11: "Just opened" in detail: the last item, started within 10 s; one copy per file
 Refines the two 2026-11-11 entries below ("A folder is built only for a file that was just opened" and "Folder switch, duplicates and deleted files").
 - **Rule:**

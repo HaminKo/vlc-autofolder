@@ -51,7 +51,8 @@ end
 --   file:///C:/My%20Videos/a.mkv   -> C:\My Videos\a.mkv
 --   file://server/share/a.mkv      -> \\server\share\a.mkv (UNC)
 --   file://localhost/C:/a.mkv      -> C:\a.mkv (another way to write a local file)
--- vlc.strings.make_path would drop the server of a UNC URI (measured).
+-- vlc.strings.make_path would drop the server localhost (measured; VLC can't
+-- open such a file itself either), so this keeps every server.
 function M.uri_to_path(uri)
     if type(uri) ~= "string" then
         return nil

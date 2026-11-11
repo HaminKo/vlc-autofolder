@@ -144,10 +144,14 @@ end
 -- the folder in sort order where its first item is.
 local function build(path, id)
     local folder, name = core.split_path(path)
+    local start = vlc.misc.mdate()
     -- The scan doesn't wait (no mwait), so catching its errors is safe.
     local ok, files = pcall(core.scan_folder, folder)
+    local scanned = vlc.misc.mdate()
     if not ok then
-        warn("cannot read the folder " .. folder .. ": " .. tostring(files))
+        -- Not retried (docs/decisions.md): opening the file again builds it.
+        warn(string.format("cannot read the folder %s after %.0f ms: %s (open the file again to retry)",
+            folder, (scanned - start) / 1000, tostring(files)))
         return
     end
 
@@ -224,8 +228,10 @@ local function build(path, id)
     end
     local after = #folder_ids - 1 - before
     local moves = arrange(folder_ids)
-    info(string.format("folder %s: %d videos, %d before and %d after %s; added %d, removed %d; %d moves",
-        folder, #files, before, after, name, added, removed, moves))
+    -- The time shows whether a slow share is the cause when the folder comes late.
+    info(string.format("folder %s: %d videos, %d before and %d after %s; added %d, removed %d; %d moves;"
+        .. " %.0f ms (scan %.0f ms)", folder, #files, before, after, name, added, removed, moves,
+        (vlc.misc.mdate() - start) / 1000, (scanned - start) / 1000))
 end
 
 -- Called when the file `id` was just opened.

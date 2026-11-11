@@ -1,8 +1,8 @@
 # To-dos
 
 ## Where we are
-- Now: To do 2, step D (500 files and UNC paths)
-- Next: To do 3, 4, 5
+- Now: To do 3 (sort-order switch)
+- Next: To do 4, 5
 - Updated: 2026-11-11
 
 Next number: 6
@@ -10,9 +10,6 @@ Next number: 6
 The requirements are in [spec.md](spec.md), and the API facts and open questions in [research/vlc-lua-api.md](research/vlc-lua-api.md).
 
 ## To do
-
-### 2. The interface script (large, built in steps): "When I open any single video, VLC automatically loads every other video in that folder, so Next/Previous work"
-In its own file: [todo/02-interface-script.md](todo/02-interface-script.md) (Approach, answers and Progress list).
 
 ### 3. Sort-order switch (medium): "Must be switchable without editing code"
 - **Problem / Goal:** sort by date modified (oldest or newest first) or by name with natural sort (Episode 2 before Episode 10). The default is date modified, oldest first.
