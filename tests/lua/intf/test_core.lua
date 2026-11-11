@@ -121,4 +121,44 @@ t.run(function()
     t.equal("scan_folder: full paths", scanned[1] and scanned[1].path, media .. "\\" .. expected[1])
     local ok = pcall(core.scan_folder, media .. "\\no such folder\\")
     t.check("scan_folder raises an error for a missing folder", not ok)
+
+    -- target_order and front_moves, on lists of ids. Folder ids are episode
+    -- numbers; 91, 92 are the user's own items. apply() replays the moves as
+    -- VLC does them: each id goes to the front.
+    local function apply(current, moves)
+        local list = {}
+        for i, id in ipairs(current) do
+            list[i] = id
+        end
+        for _, id in ipairs(moves) do
+            for i, x in ipairs(list) do
+                if x == id then
+                    table.remove(list, i)
+                    break
+                end
+            end
+            table.insert(list, 1, id)
+        end
+        return table.concat(list, " ")
+    end
+    -- { label, current playlist, folder in sort order, expected order, expected moves }
+    local arrangements = {
+        { "already in order", { 1, 2, 3 }, { 1, 2, 3 }, "1 2 3", 0 },
+        { "opened in the middle", { 3, 1, 2, 4, 5 }, { 1, 2, 3, 4, 5 }, "1 2 3 4 5", 2 },
+        { "opened last", { 5, 1, 2, 3, 4 }, { 1, 2, 3, 4, 5 }, "1 2 3 4 5", 4 },
+        { "user items before the folder stay before it", { 91, 92, 3, 1, 2, 4, 5 }, { 1, 2, 3, 4, 5 },
+            "91 92 1 2 3 4 5", 4 },
+        { "a user item inside the folder goes after it", { 1, 91, 2, 3, 92 }, { 1, 2, 3 }, "1 2 3 91 92", 3 },
+        { "a folder id not in the playlist is left out", { 3, 1 }, { 1, 2, 3 }, "1 3", 1 },
+        { "an empty playlist", {}, {}, "", 0 },
+    }
+    each("target_order and front_moves", arrangements, function(case)
+        local label, current, folder, want, want_moves = case[1], case[2], case[3], case[4], case[5]
+        local target = core.target_order(current, folder)
+        local moves = core.front_moves(current, target)
+        local got = apply(current, moves)
+        local message = string.format("%s: target %s, after the moves %s, %d moves",
+            label, table.concat(target, " "), got, #moves)
+        return table.concat(target, " ") == want and got == want and #moves == want_moves, message
+    end)
 end)

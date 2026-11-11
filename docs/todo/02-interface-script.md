@@ -16,7 +16,7 @@ Built in four steps (one chat each). Moved here from [../todo.md](../todo.md) on
     - Enqueue all missing files in one call.
     - Look up the new ids with `get("playlist")`.
     - ~~Move each one into place around the playing item.~~ **Replaced (To do 1 step B):** VLC 3.0's `move` after an item is broken (wrong place or a crash). Files after the playing one: enqueue in order (appended). Files before it: enqueue, then move each to the front of the playlist node, last one first (decisions.md, 2026-11-11).
-    - Step B generalizes this: the folder's items are put at the front of the playlist, in order, with the fewest moves to the node; items the user added stay after them.
+    - Step B generalizes this: ~~the folder's items are put at the front of the playlist, in order, with the fewest moves to the node; items the user added stay after them.~~ **Replaced (step B questions):** the folder takes the place of its first item (normally the opened file); the user's items before it stay before it, the others after it. Reached with the fewest moves to the node (decisions.md, 2026-11-11).
   - URI to path: own conversion for local and UNC URIs (`decode_uri`, then the prefix); `vlc.strings.make_path` drops a UNC server. `make_uri` equals VLC's own URIs (research/vlc-lua-api.md, measured).
   - Paths are compared by a key: `/` as `\`, ASCII letters lower-cased (Windows paths ignore case).
   - State: the active folder, and the ids this script manages.
@@ -70,10 +70,26 @@ Built in four steps (one chat each). Moved here from [../todo.md](../todo.md) on
     - Moved to step C: the cleared-playlist gap. Moved to step D: no retry of an unreadable folder.
     - Left: a race with a simultaneous hand-over, and the wider "Interrupted." allowance in the runner (the "done" line still guards it).
     - One finding was wrong: `vlc.msg.err` does log as `lua error:`.
-  - Next: step B adds the earlier files: enqueue them, then move the folder's items to the front of the playlist node in order (the playing file's index is already computed in `build`).
-- [ ] **Step B: insert earlier files before the playing one** (~150 lines)
-  - Enqueue them, then move the folder's items to the front of the playlist node in order, with the fewest moves; the user's own items stay after the folder.
-  - Tests: whole folder in order, Previous works, playback not restarted, a user item stays after the folder.
+  - Next: step B adds the earlier files (done, see below).
+- [x] **Step B: insert earlier files before the playing one** (done 2026-11-11; tested by the user)
+  - Planned ~150 lines; built ~220 (code, tests and runner).
+  - Choice (the user, step B questions): the folder takes the place of its first item (normally the opened file); the user's items before it stay before it, the others after it. Rejected: the folder at the front with the user's items after it (decisions.md, 2026-11-11).
+  - Built:
+    - `autofolder_core.lua`: `target_order` (the wanted order of the playlist's ids) and `front_moves` (the fewest moves to the front that reach it: the longest end part already in order stays, the rest is moved, last one first). Pure functions on id lists.
+    - `autofolder.lua`: `build` enqueues all missing folder files in one call in sort order; `enqueue` sets each file's id (matched by URI); `arrange` moves to the playlist node only and logs a failed move. Log line: `folder X: 16 videos; added 12 before and 3 after NAME; 12 moves`.
+    - Tests:
+      - `test_core`: 7 arrangements (in order, opened in the middle or last, user items before or inside the folder, a missing id, empty); each replays the moves and checks the result and the move count.
+      - `test_build`: expects the whole folder; Previous plays the file before the opened one and changes nothing. New case build-user: the driver enqueues `summer.mkv` (another folder), then opens `Episode 1.mkv` with `playlist.add`, as a double-click into a running VLC.
+      - `run-tests.ps1`: a `Config` field adds fields to a driver's config table; the log patterns include the exact move counts (0, 12, 15, 15, 3).
+  - Found (research/vlc-lua-api.md): moves in the build poll keep the opened file playing (same id, started once) and Previous right. The build doesn't always run before VLC creates the opened file's input: in this step's runs the input came first, ~300 ms earlier.
+  - Tests:
+    - luacheck and PSScriptAnalyzer clean; run-tests.ps1 passes, 9 cases in ~31 s (measured, twice).
+    - The user, in the portable test VLC with a window: `hash # sign.mkv` gave the 16 videos in date order, playing in 5th place, Previous and Next right, one build line with 4 moves; `summer.mkv` enqueued, then Open File on `Episode 1.mkv`: summer.mkv stayed first, then the folder, 3 moves.
+  - Review (code-review, medium): 10 findings, no code fix needed; the README and decision docs it flagged were updated.
+    - Moved to step C: folder files already in the playlist are enqueued again (the old copy counts as a user item); user items after the playing file go behind the folder (only with step A's trigger; step C's "just opened" rule leaves none after it).
+    - Moved to step D: hundreds of moves in one poll; `arrange` reads the playlist a third time per build (enqueue's snapshot could be reused).
+    - Left: a file whose URI VLC writes differently from `make_uri` gets no id and stays at the end (only a warning); measured equal for every test name. A `]]` in the test folder path would break the `Config` string.
+  - Next: step C, the playlist rules: the "just opened" trigger, folder switch, duplicates and the refresh, deleted files.
 - [ ] **Step C: the playlist rules (answers 1–3)** (~300 lines)
   - The "just opened" trigger, folder switch, no duplicates and the refresh, removal of deleted files, .m3u and several files opened at once.
   - The refresh also fixes a step A gap: after the playlist was cleared, opening another file from the folder built last adds nothing (the folder still counts as built).

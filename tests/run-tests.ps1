@@ -36,6 +36,7 @@ $ErrorActionPreference = 'Stop'
 #   Files:        put on VLC's command line, like a double-click; relative to the media folder,
 #                 or a full path.
 #   LogMustMatch: regexes that must each match a line of VLC's log.
+#   Config:       more fields for the driver's config table, in Lua syntax (e.g. "open=[[a.mkv]]").
 # The driver's config table (lua-config) holds: out (its results file), media (the media
 # folder), videos (the video list file, oldest first) and unc (the media folder as a UNC path).
 $cases = @(
@@ -55,23 +56,31 @@ $cases = @(
         Name = 'core'; Driver = 'test_core'; Files = @(); TimeoutSec = 20
     }
     # Building the folder from the first, a middle and the last video by date (16 videos, the
-    # dot-name not counted), and from the dot-named one, which the scan itself skips.
+    # dot-name not counted), and from the dot-named one, which the scan itself skips. The move
+    # counts are the fewest moves to the front for each case.
     @{
         Name = 'build-first'; Driver = 'test_build'; Autofolder = $true; Files = @('Episode 10.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, added 15 after Episode 10\.mkv$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos; added 0 before and 15 after Episode 10\.mkv; 0 moves$')
     }
     @{
-        # The Japanese name: Unicode in the opened file and in the files added after it.
+        # The Japanese name: Unicode in the opened file and in the files added around it.
         Name = 'build-middle'; Driver = 'test_build'; Autofolder = $true; Files = @($testVideos[12]); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, added 3 after ')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos; added 12 before and 3 after .+; 12 moves$')
     }
     @{
         Name = 'build-last'; Driver = 'test_build'; Autofolder = $true; Files = @('attribute-hidden.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, added 0 after attribute-hidden\.mkv$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos; added 15 before and 0 after attribute-hidden\.mkv; 15 moves$')
     }
     @{
         Name = 'build-dot'; Driver = 'test_build'; Autofolder = $true; Files = @('.dot-hidden.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 17 videos, added 1 after \.dot-hidden\.mkv$')
+        LogMustMatch = @('\[autofolder\] folder .+: 17 videos; added 15 before and 1 after \.dot-hidden\.mkv; 15 moves$')
+    }
+    @{
+        # A running VLC: the user's own item (a video in another folder) is in the playlist, then a
+        # folder file is opened. The user's item stays first; it and 2 videos are moved.
+        Name = 'build-user'; Driver = 'test_build'; Autofolder = $true; Files = @(); TimeoutSec = 30
+        Config = 'user=[[{0}]],open=[[Episode 1.mkv]]' -f (Join-Path $testRoot 'summer.mkv')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos; added 2 before and 13 after Episode 1\.mkv; 3 moves$')
     }
 )
 
@@ -82,7 +91,8 @@ function Invoke-TestCase {
     $log = Join-Path $testRoot "logs\$($Spec.Name).log"
     $intf = "luaintf{intf=$($Spec.Driver)}"
     if ($Spec.Autofolder) { $intf = "luaintf{intf=autofolder}:$intf" }
-    $luaConfig = '{0}={{out=[[{1}]],media=[[{2}]],videos=[[{3}]],unc=[[{4}]]}}' -f $Spec.Driver, $out, $media, $videoList, $uncMedia
+    $extra = if ($Spec.Config) { ',' + $Spec.Config } else { '' }
+    $luaConfig = '{0}={{out=[[{1}]],media=[[{2}]],videos=[[{3}]],unc=[[{4}]]{5}}}' -f $Spec.Driver, $out, $media, $videoList, $uncMedia, $extra
     $vlcArgs = (Get-HeadlessVlcArgumentList -Log $log) + @(
         '--no-one-instance', '--no-one-instance-when-started-from-file'   # never hand files to another VLC
         '--extraintf', "`"$intf`""

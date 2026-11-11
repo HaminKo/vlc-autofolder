@@ -80,6 +80,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
 - Registered: `prev`, `next`, `skip`, `play`, `pause`, `stop`, `clear`, `repeat`/`repeat_`, `loop`, `random`, `goto` (Lua < 5.2 only, so present here), `gotoitem`, `add`, `enqueue`, `get`, `search`, `current`, `sort`, `status`, `delete`, `move`.
 - **`current()`** returns the playing item's id, or -1.
   - **Measured 2026-11-11 (To do 2 step A):** it returns the new item's id **before VLC creates that item's input**: autofolder's build log line came before `Creating an input for 'Episode 2.mkv'`. So the folder is built while the opened file is still opening.
+    - **Not always (measured 2026-11-11, To do 2 step B):** in all 5 build cases of one run, `Creating an input for '<opened file>'` came ~150 log lines before the build line. autofolder's first poll ran before playback started (it saw nothing playing), so the build came at the next poll. Which comes first depends on timing; the build must work both ways.
 - **`gotoitem(id)`** plays the item with that id (measured 2026-11-11, test_build.lua).
 - `nb_played` is 1 for an item that has started once (measured 2026-11-11, test_build.lua).
 - **`add(items)` / `enqueue(items)`**
@@ -103,6 +104,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
     - The playing item keeps playing: same id, and the time doesn't go back.
     - Next and Previous follow the new order.
     - Moving the playing item itself to the front also keeps it playing, and Next then follows the new order.
+    - **Also during a build (measured 2026-11-11, To do 2 step B, test_build.lua):** 0 to 15 moves in the same poll as the enqueue, right as the opened file starts. In all 5 cases the opened file kept its id, was started once (`nb_played` 1), and Previous played the file before it. Not measured: whether the Qt playlist view shows the new order at once (manual test), and the time for hundreds of moves (step D).
 - `auto-preparse=1` (default) makes VLC read metadata of every added item. With hundreds of files, especially on a network share, that is background work to watch in To do 2.
   - **Measured 2026-11-11 (To do 2 step A):** after `enqueue`, the log shows `Creating an input for preparsing '<name>'` for each added item, one after another, interleaved with the opening of the playing file.
   - On the first test run of the day, the smoke case's Episode 2.mkv (14 files added) took more than 5 s to show its first picture; three warm runs right after took 1.2 s per case. Whether the preparsing slows a cold start is **not measured** (one cold run only; cold opens of 7.9 s were measured before any files were added). To check in step D, with a large folder.

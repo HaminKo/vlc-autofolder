@@ -191,4 +191,65 @@ function M.scan_folder(folder)
     return files
 end
 
+-- The order the playlist should have once the folder is placed: the items
+-- before the folder's first item (the user's own), then the folder's items in
+-- sort order, then all other items in their current order. So the folder takes
+-- the place of its first item, as when VLC opens a folder itself.
+-- current: the playlist's item ids, in order. folder: the folder's ids in sort
+-- order; ids that are not in current are left out. Returns a list of ids.
+function M.target_order(current, folder)
+    local present, in_folder = {}, {}
+    for _, id in ipairs(current) do
+        present[id] = true
+    end
+    for _, id in ipairs(folder) do
+        in_folder[id] = true
+    end
+    local before, after, seen = {}, {}, false
+    for _, id in ipairs(current) do
+        if in_folder[id] then
+            seen = true
+        elseif seen then
+            after[#after + 1] = id
+        else
+            before[#before + 1] = id
+        end
+    end
+    local target = before
+    for _, id in ipairs(folder) do
+        if present[id] then
+            target[#target + 1] = id
+        end
+    end
+    for _, id in ipairs(after) do
+        target[#target + 1] = id
+    end
+    return target
+end
+
+-- The fewest moves "to the front of the playlist" that turn the order current
+-- into target (two lists of the same ids): the ids to move, one after another.
+-- Items that are never moved keep their order and end up after the moved
+-- ones. So the longest end part of target that is already in current's order
+-- stays; every item before it is moved, last one first.
+function M.front_moves(current, target)
+    local pos = {}
+    for i, id in ipairs(current) do
+        pos[id] = i
+    end
+    local keep = #target + 1 -- target[keep], target[keep + 1], ... stay
+    while keep > 1 do
+        local p = pos[target[keep - 1]]
+        if not p or (keep <= #target and p > pos[target[keep]]) then
+            break
+        end
+        keep = keep - 1
+    end
+    local moves = {}
+    for i = keep - 1, 1, -1 do
+        moves[#moves + 1] = target[i]
+    end
+    return moves
+end
+
 return M

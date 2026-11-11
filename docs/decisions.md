@@ -2,6 +2,12 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-11: The folder takes the place of its first item; the user's own items keep theirs
+- **Rule:** after a build, the playlist is: the user's items that were before the folder's first item (normally the opened file), then the folder in sort order, then all other items in their order. The fewest moves to the front reach that order; that can move the user's items too.
+- **Reason:** the user's items stay where they put them, and the folder goes where the opened file landed (at the end, since a double-click appends), as when VLC opens a folder itself (it expands the folder in place). With the folder first, VLC would play on into unrelated items after the last episode, and the user's list would be reordered.
+- **Who:** the user, accepting Claude's suggestion (To do 2 step B questions).
+- **Rejected:** the folder at the front of the playlist with the user's items after it (the step B plan written in step A): see Reason. It also needs a move for every folder item as soon as any user item is in the playlist.
+
 ## 2026-11-11: A folder is built only for a file that was just opened
 - **Rule:** the playing item triggers a build only when it was added after the previous file started playing, plays straight away, and is the newest item in the playlist. Playing an item that was already there (a click, Next/Previous, an .m3u's entries, several files opened at once) never builds.
 - **Reason:** the double-click, Open File and drag-onto-window cases all add one item and play it at once; a hand-made playlist must stay as the user made it.
@@ -22,6 +28,7 @@ One entry per decision, newest first. Each entry has the date and the decision a
 ## 2026-11-11: The folder logic places files only by moving them to the front of the playlist node
 - **Reason:** VLC 3.0's Lua `playlist.move(id, target)` with an item as target computes the new place from item ids, not positions: wrong places, and a crash when the index falls out of range (measured; research/vlc-lua-api.md, "Playlist"). Moving into the playlist node (the item becomes first) works and keeps playback and Next/Previous right (measured).
 - **How:** enqueue the files after the playing one in order (appended); enqueue the files before it, then move each to the front, last one first.
+  - **Since To do 2 step B:** all missing files are enqueued in one call in sort order, then `autofolder_core.front_moves` gives the fewest moves to the front that reach the wanted order (the entry above). This also keeps the user's items before the folder, which the first "How" would have split from it.
 - **Who:** Claude, forced by the To do 1 step B measurement; the user accepted it with the To do 2 plan (2026-11-11).
 - **Rejected:**
   - `move` after an item: wrong place or a crash.

@@ -5,7 +5,7 @@ Open one video in VLC and the rest of its folder is added to the playlist automa
 When you open a single video file in VLC 3.0 on Windows (for example by double-clicking it in File Explorer), a small Lua script that runs in the background adds every other video in the same folder to the playlist. It keeps them in your chosen sort order (date modified or natural name order), with the opened file in its correct place. The file you opened keeps playing. You don't have to open the folder or click anything.
 
 ## Status
-In development: opening a video adds the videos that come after it in its folder, by date modified. The earlier files, folder switches and the install script are still to come. Built for VLC 3.0.24 on Windows 11.
+In development: opening a video adds the other videos of its folder, before and after it, by date modified; items you added to the playlist yourself keep their places. Folder switches, duplicates and the install script are still to come. Built for VLC 3.0.24 on Windows 11.
 
 ## Install (planned)
 1. Close VLC.

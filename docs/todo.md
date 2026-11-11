@@ -1,7 +1,7 @@
 # To-dos
 
 ## Where we are
-- Now: To do 2, step B (insert earlier files before the playing one)
+- Now: To do 2, step C (the playlist rules)
 - Next: To do 3, 4, 5
 - Updated: 2026-11-11
 
