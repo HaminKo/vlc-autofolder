@@ -161,4 +161,72 @@ t.run(function()
             label, table.concat(target, " "), got, #moves)
         return table.concat(target, " ") == want and got == want and #moves == want_moves, message
     end)
+
+    -- just_opened: { label, id, last item, started_max, seconds as last item, first play, expected }
+    local window = core.JUST_OPENED_S
+    local starts = {
+        { "added and started at once", 7, 7, 5, 0.3, false, true },
+        { "started at the end of the window", 7, 7, 5, window, false, true },
+        { "started after the window (enqueued, then clicked or reached with Next)", 7, 7, 5, window + 0.5,
+            false, false },
+        { "the first item to play after VLC starts, however late", 7, 7, 0, 60, true, true },
+        { "not the last item (several files opened at once)", 6, 7, 5, 0.3, false, false },
+        { "the first item to play, but not the last", 6, 7, 0, 0.3, true, false },
+        { "added before the previous item started", 7, 7, 7, 0.3, false, false },
+    }
+    each("just_opened", starts, function(case)
+        local got = core.just_opened(case[2], case[3], case[4], case[5], case[6])
+        return got == case[7], case[1] .. ": " .. tostring(got)
+    end)
+
+    -- match_items, on a made-up folder C:\F\ with a, b and c, and items as
+    -- VLC lists them ({ id, path = URI }). gone.mkv no longer exists.
+    local function uri(path)
+        return vlc.strings.make_uri(path)
+    end
+    local function exists(path)
+        return not path:find("gone", 1, true)
+    end
+    local function folder_files()
+        return {
+            { name = "a.mkv", path = "C:\\F\\a.mkv" },
+            { name = "b.mkv", path = "C:\\F\\b.mkv" },
+            { name = "C.mkv", path = "C:\\F\\C.mkv" },
+        }
+    end
+    local function ids_of(list)
+        local ids = {}
+        for i, file in ipairs(list) do
+            ids[i] = tostring(file.id)
+        end
+        return table.concat(ids, " ")
+    end
+    local items = {
+        { id = 91, path = uri("C:\\G\\a.mkv") },        -- another folder
+        { id = 1, path = uri("C:\\F\\a.mkv") },
+        { id = 2, path = uri("C:\\F\\b.mkv") },
+        { id = 92, path = uri("C:\\F\\Sub\\a.mkv") },   -- a subfolder
+        { id = 93, path = uri("C:\\F\\notes.txt") },    -- not a video
+        { id = 94, path = uri("C:\\F\\.dot.mkv") },     -- a video the scan skips, still there
+        { id = 95, path = "http://example.com/a.mkv" }, -- not a file
+        { id = 6, path = uri("C:\\F\\b.mkv") },         -- a second copy of b
+        { id = 7, path = uri("C:\\F\\gone.mkv") },      -- its file is gone
+        { id = 8, path = uri("C:\\f\\c.MKV") },         -- C.mkv, other case
+        { id = 9, path = uri("C:\\F\\a.mkv") },         -- a again: the opened copy
+    }
+    local matched = folder_files()
+    t.equal("match_items: copies, gone files; other folders, subfolders, other types and dot-names stay",
+        table.concat(core.match_items(items, "C:\\F\\", matched, 9, exists), " "), "6 7 1")
+    t.equal("match_items: the opened copy of a, the first copy of b, C in other case", ids_of(matched), "9 2 8")
+    t.equal("match_items: the copies of a and b",
+        table.concat(matched[1].copies or {}, " ") .. " / " .. table.concat(matched[2].copies or {}, " "), "1 / 6")
+    matched = folder_files()
+    t.equal("match_items: with the opened item elsewhere, the first copy stays",
+        table.concat(core.match_items(items, "C:\\F\\", matched, 91, exists), " "), "6 7 9")
+    t.equal("match_items: ids with the opened item elsewhere", ids_of(matched), "1 2 8")
+    matched = folder_files()
+    t.equal("match_items: the opened item is never deleted, even if its file is gone",
+        table.concat(core.match_items({ { id = 7, path = uri("C:\\F\\gone.mkv") } }, "C:\\F\\", matched, 7,
+            exists), " "), "")
+    t.equal("match_items: files with no item keep no id", ids_of(matched), "nil nil nil")
 end)

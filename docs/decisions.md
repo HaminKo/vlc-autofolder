@@ -2,6 +2,22 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-11: "Just opened" in detail: the last item, started within 10 s; one copy per file
+Refines the two 2026-11-11 entries below ("A folder is built only for a file that was just opened" and "Folder switch, duplicates and deleted files").
+- **Rule:**
+  - "Plays straight away": the item starts at most 10 s (`autofolder_core.JUST_OPENED_S`) after it became the playlist's last item. The first item to play after VLC starts always counts.
+  - "The newest item": the **last item by position**, not the highest id.
+  - "Added after the previous file started": its id is above the highest id in the playlist when the previous item started.
+  - Copies of a folder file: the playing copy stays; when none plays, the first one in the playlist. All other copies are removed, the user's own ones too. If any copy was the user's own item, the copy that stays counts as the user's, so a folder switch doesn't remove it.
+  - Items whose file is gone are removed only when their folder is built, and only after `stat` confirms it.
+- **Reason:** Lua can't see whether VLC was told to play an item or the user clicked it later; it only sees when an item appears and when it starts. A double-click starts its file within about a second. A slow start needs the margin: a cold VLC start loading Qt, or an old file slow to stop (6 s once in a headless test). VLC numbers the files of its command line in reverse (measured), so with "highest id" the first of several files would build.
+- **Who:** the user, accepting Claude's suggestions (To do 2 step C questions); the copy-ownership part came from the step C code review.
+- **Rejected:**
+  - A shorter window: it could miss a real double-click.
+  - No time rule ("added after the previous file started" and "last" only): an item enqueued while another plays would build when playback reaches it.
+  - Removing only the copies the script added: it leaves duplicates (spec requirement 7).
+- **Known gap:** an item enqueued less than 10 s before playback reaches it (by itself, Next or a click) builds its folder.
+
 ## 2026-11-11: The folder takes the place of its first item; the user's own items keep theirs
 - **Rule:** after a build, the playlist is: the user's items that were before the folder's first item (normally the opened file), then the folder in sort order, then all other items in their order. The fewest moves to the front reach that order; that can move the user's items too.
 - **Reason:** the user's items stay where they put them, and the folder goes where the opened file landed (at the end, since a double-click appends), as when VLC opens a folder itself (it expands the folder in place). With the folder first, VLC would play on into unrelated items after the last episode, and the user's list would be reordered.

@@ -9,7 +9,8 @@ autofolder, in one of two ways:
 Expected: the playlist becomes the user's item (if any), then every video of
 the folder in date order (videos.txt, without names starting with "." other
 than the opened one), and the opened file keeps playing. Previous plays the
-video before it; Previous and clicking items change nothing.
+video before it; Previous and clicking items (the user's item too) change
+nothing.
 The runner checks autofolder's log line for the counts.
 --]]
 
@@ -64,8 +65,8 @@ t.run(function()
             at = i
         end
     end
-    -- Previous, to a video autofolder added before the opened file (not to the
-    -- user's item: playing that would build its folder until step C).
+    -- Previous, to a video autofolder added before the opened file (the user's
+    -- item is clicked at the end).
     local first_video = config.open and 2 or 1
     if at and at > first_video then
         step("Previous: the video before the opened file", vlc.playlist.prev, items[at - 1].id)
@@ -83,4 +84,10 @@ t.run(function()
     step("clicking the opened file", function() vlc.playlist.gotoitem(playing.id) end, playing.id)
     t.sleep(1)
     t.equal("clicking the opened file doesn't change the playlist", t.playlist_names(), order)
+    if config.open then
+        -- In another folder: a build would remove this folder (a switch).
+        step("clicking the user's item", function() vlc.playlist.gotoitem(items[1].id) end, items[1].id)
+        t.sleep(1)
+        t.equal("clicking the user's item doesn't change the playlist", t.playlist_names(), order)
+    end
 end)

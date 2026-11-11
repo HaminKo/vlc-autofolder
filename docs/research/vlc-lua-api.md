@@ -59,6 +59,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
   - **Measured 2026-11-10:** in portable mode it returns the `portable` folder next to vlc.exe; `vlc.config.datadir()` returns VLC's program folder.
 - **Measured 2026-11-10:** `vlc.io.open(path, "w")` with `:write`, `:flush` and `:close` works in an interface script (the test library writes its results this way).
   - When it can't open the file (a folder that doesn't exist), it returns **no value at all**, not `nil` plus a message like Lua's `io.open`. So `assert(vlc.io.open(...))` only says "bad argument #1 to 'assert' (value expected)"; check the result and raise your own message.
+  - **Measured 2026-11-11 (To do 2 step C, test_rules.lua):** modes `"rb"` and `"wb"` with `read("*a")` copy a 185 KB video (the copy was scanned and enqueued as a video; its bytes weren't compared). **`vlc.io.unlink(path)`** exists and deletes a file.
 
 ## Strings and URIs (source: README)
 - `vlc.strings.make_uri(path, [scheme])` converts a path to a URI.
@@ -87,10 +88,14 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
   - Each item is a table with `path` (a URI), `name`, `options`, and more.
   - They append with `playlist_AddInput`; `add` also plays, `enqueue` doesn't.
   - They return **a count, not item ids**. Find the new ids afterwards with `get("playlist")`. **Measured 2026-11-11:** `enqueue` of 3 items returned 3; the playlist node had id 1, and items got ids 2, 3, ... in the order they were added.
+- **Files on VLC's command line get their ids in reverse order** (measured 2026-11-11, To do 2 step C, rules-several): `vlc.exe "Episode 1.mkv" "Episode 2.mkv"` gave the list `Episode 1.mkv` (id 3), `Episode 2.mkv` (id 2), and `Episode 1.mkv` played. So the playing first file has the highest id: "the newest item" must mean the **last by position**, not the highest id. (Probably because 3.0's `GetFilenames` walks the arguments from the last one, inserting each at the top: from memory of the source, not checked.)
 - **`get(what)`**
   - `"playlist"` or `"normal"` returns the playing node; `"ml"` the media library; `"root"` the root; a number returns one item by id.
   - Each item is a table: `id`, `flags` (`disabled`, `ro`), `name`, `path` (URI), `duration` (seconds, -1 if unknown), `nb_played`, and `children` for nodes.
 - **`delete(id)`** returns 0, or -1 if there is no such id.
+  - **Measured 2026-11-11 (To do 2 step C, rules-switch and rules-refresh):** deleting items that don't play, right after another item started (15 at a folder switch; an earlier copy and an item whose file is gone at a refresh), keeps the playing item playing: same id, started once.
+  - Ids come from a counter that only grows (3.0 source `i_last_playlist_id`, from memory, not checked; it fits every id measured so far), so an old id never names a new item; deleting it again returns -1.
+- **`clear()`** empties the playlist node and stops playback; `current()` is then -1 (measured 2026-11-11, rules-refresh). A file opened after that gets a new id as usual.
 - **`move(id_item, id_where)`**
   - If `id_where` is a node, the item becomes its **first** child.
   - ~~Otherwise the item is placed **after** `id_where`, in the same parent.~~ **Wrong, measured 2026-11-11.** The 3.0.x source (`vlclua_playlist_move`) computes the new index from **item ids**: `id_where - first_child_id + 1`, not from `id_where`'s position. That is only right when ids happen to follow the playlist order.
@@ -113,6 +118,8 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
   - The subfolder came first, before names that sort ahead of it. The non-video files of the test folder (`.srt`, `.jpg`, `.txt`, `.nfo`, `.m3u`) and the dot-name `.dot-hidden.mkv` are left out; the attribute-hidden file is kept.
   - The order is roughly natural and case-insensitive, but not quite: `Episode 1, Episode 2, Episode 10, episode 3`.
   - The entries' URIs equal `make_uri` of their paths.
+- **Opening an .m3u** (measured 2026-11-11, To do 2 step C, rules-m3u; `playlist.m3u` lists `Episode 1.mkv` and `Episode 2.mkv`, given on the command line): the .m3u item is replaced in place by its entries, a flat list with new ids in list order (3, 4), and the first entry plays. autofolder's 300 ms poll never saw the .m3u item itself playing.
+  - With `playlist-tree` on (not the default), the entries would stay under a node. autofolder only looks at the playlist node's direct children, so such nested items aren't matched or de-duplicated (not tested).
 
 ## One-instance mode (measured 2026-11-11, tests\spike-one-instance.ps1)
 First from memory of `src/win32/specific.c` (both now confirmed):

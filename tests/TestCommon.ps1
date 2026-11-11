@@ -109,8 +109,10 @@ function Initialize-TestFolder {
         'playlist.m3u'  = "#EXTM3U`nEpisode 1.mkv`nEpisode 2.mkv`n"
     }
 
+    $season2 = Join-Path $media 'Season 2'
+    $refresh = Join-Path $testRoot 'refresh'
     if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
-    foreach ($dir in @($media, (Join-Path $media 'Season 2'), (Join-Path $testRoot 'results'), (Join-Path $testRoot 'logs'))) {
+    foreach ($dir in @($media, $season2, $refresh, (Join-Path $testRoot 'results'), (Join-Path $testRoot 'logs'))) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
     $video = Get-Y4mVideo
@@ -130,7 +132,21 @@ function Initialize-TestFolder {
         [IO.File]::WriteAllText($path, $others[$name], $utf8)
         [IO.File]::SetLastWriteTime($path, $time)
     }
-    [IO.File]::WriteAllBytes((Join-Path $media 'Season 2\Episode 1.mkv'), $video)  # in a subfolder: must be ignored
+    # In a subfolder: ignored when the media folder is built; the folder switch case builds it.
+    # The refresh case deletes and adds files in refresh\ while VLC runs.
+    $folders = [ordered]@{
+        $season2 = @('Episode 1.mkv', 'Episode 2.mkv'), (New-Object DateTime 2026, 2, 1, 12, 0, 0)
+        $refresh = @('a.mkv', 'b.mkv', 'c.mkv'), (New-Object DateTime 2026, 3, 1, 12, 0, 0)
+    }
+    foreach ($dir in $folders.Keys) {
+        $names, $time = $folders[$dir]
+        foreach ($name in $names) {
+            $path = Join-Path $dir $name
+            [IO.File]::WriteAllBytes($path, $video)
+            [IO.File]::SetLastWriteTime($path, $time)
+            $time = $time.AddHours(1)
+        }
+    }
     # Outside the media folder: a file dated in summer time (DST), to check the times stat reports.
     $summer = Join-Path $testRoot 'summer.mkv'
     [IO.File]::WriteAllBytes($summer, $video)

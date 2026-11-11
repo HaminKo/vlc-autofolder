@@ -36,6 +36,7 @@ $ErrorActionPreference = 'Stop'
 #   Files:        put on VLC's command line, like a double-click; relative to the media folder,
 #                 or a full path.
 #   LogMustMatch: regexes that must each match a line of VLC's log.
+#   LogMustNotMatch: regexes that no line of VLC's log may match.
 #   Config:       more fields for the driver's config table, in Lua syntax (e.g. "open=[[a.mkv]]").
 # The driver's config table (lua-config) holds: out (its results file), media (the media
 # folder), videos (the video list file, oldest first) and unc (the media folder as a UNC path).
@@ -60,27 +61,67 @@ $cases = @(
     # counts are the fewest moves to the front for each case.
     @{
         Name = 'build-first'; Driver = 'test_build'; Autofolder = $true; Files = @('Episode 10.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos; added 0 before and 15 after Episode 10\.mkv; 0 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 0 before and 15 after Episode 10\.mkv; added 15, removed 0; 0 moves$')
     }
     @{
         # The Japanese name: Unicode in the opened file and in the files added around it.
         Name = 'build-middle'; Driver = 'test_build'; Autofolder = $true; Files = @($testVideos[12]); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos; added 12 before and 3 after .+; 12 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 12 before and 3 after .+; added 15, removed 0; 12 moves$')
     }
     @{
         Name = 'build-last'; Driver = 'test_build'; Autofolder = $true; Files = @('attribute-hidden.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos; added 15 before and 0 after attribute-hidden\.mkv; 15 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 15 before and 0 after attribute-hidden\.mkv; added 15, removed 0; 15 moves$')
     }
     @{
         Name = 'build-dot'; Driver = 'test_build'; Autofolder = $true; Files = @('.dot-hidden.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 17 videos; added 15 before and 1 after \.dot-hidden\.mkv; 15 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 17 videos, 15 before and 1 after \.dot-hidden\.mkv; added 16, removed 0; 15 moves$')
     }
     @{
         # A running VLC: the user's own item (a video in another folder) is in the playlist, then a
-        # folder file is opened. The user's item stays first; it and 2 videos are moved.
+        # folder file is opened. The user's item stays first; it and 2 videos are moved. Clicking
+        # the user's item afterwards builds nothing.
         Name = 'build-user'; Driver = 'test_build'; Autofolder = $true; Files = @(); TimeoutSec = 30
         Config = 'user=[[{0}]],open=[[Episode 1.mkv]]' -f (Join-Path $testRoot 'summer.mkv')
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos; added 2 before and 13 after Episode 1\.mkv; 3 moves$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, removed 0; 3 moves$')
+        LogMustNotMatch = @('\[autofolder\] left folder')
+    }
+    # The playlist rules (test_rules.lua describes each scenario).
+    @{
+        Name = 'rules-switch'; Driver = 'test_rules'; Autofolder = $true; Files = @(); TimeoutSec = 40
+        Config = 'scenario=[[switch]]'
+        LogMustMatch = @(
+            '\[autofolder\] folder .+\\media\\: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, removed 1; 3 moves$'
+            '\[autofolder\] left folder .+\\media\\: removed 15 items$'
+            '\[autofolder\] folder .+\\Season 2\\: 2 videos, 0 before and 1 after Episode 1\.mkv; added 1, removed 0; 0 moves$'
+        )
+    }
+    @{
+        Name = 'rules-refresh'; Driver = 'test_rules'; Autofolder = $true; Files = @(); TimeoutSec = 40
+        Config = 'scenario=[[refresh]]'
+        LogMustMatch = @(
+            '\[autofolder\] folder .+\\refresh\\: 3 videos, 1 before and 1 after b\.mkv; added 2, removed 0; 1 moves$'
+            '\[autofolder\] folder .+\\refresh\\: 3 videos, 0 before and 2 after a\.mkv; added 1, removed 2; 1 moves$'
+        )
+        LogMustNotMatch = @('\[autofolder\] left folder')
+    }
+    @{
+        # Several files at once: the first plays, but it isn't the last item.
+        Name = 'rules-several'; Driver = 'test_rules'; Autofolder = $true; Files = @('Episode 1.mkv', 'Episode 2.mkv'); TimeoutSec = 30
+        Config = 'scenario=[[no-build]],expect=[[media\Episode 1.mkv | media\Episode 2.mkv]]'
+        LogMustNotMatch = @('\[autofolder\] (left )?folder ')
+    }
+    @{
+        # An .m3u (Episode 1.mkv, Episode 2.mkv): replaced by its entries, which aren't just opened.
+        Name = 'rules-m3u'; Driver = 'test_rules'; Autofolder = $true; Files = @('playlist.m3u'); TimeoutSec = 30
+        Config = 'scenario=[[no-build]],expect=[[media\Episode 1.mkv | media\Episode 2.mkv]]'
+        LogMustNotMatch = @('\[autofolder\] (left )?folder ')
+    }
+    @{
+        # Waits for core.JUST_OPENED_S (10 s) + 1 s.
+        Name = 'rules-late'; Driver = 'test_rules'; Autofolder = $true; Files = @('Episode 2.mkv'); TimeoutSec = 45
+        Config = 'scenario=[[late]]'
+        LogMustMatch = @('\[autofolder\] item \d+ started, no build: added 1\d\.\d s before it started$')
+        LogMustNotMatch = @('\[autofolder\] left folder', '\[autofolder\] folder .+Season 2')
     }
 )
 
@@ -133,6 +174,10 @@ function Invoke-TestCase {
     }
     foreach ($pattern in $Spec.LogMustMatch) {
         if (-not ($logLines -match $pattern)) { $problems.Add("log: no line matches /$pattern/") }
+    }
+    foreach ($pattern in $Spec.LogMustNotMatch) {
+        $hits = @($logLines -match $pattern)
+        if ($hits) { $problems.Add("log: a line matches /$pattern/: $($hits[0])") }
     }
 
     $passed = $problems.Count -eq 0

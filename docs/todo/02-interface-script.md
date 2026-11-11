@@ -90,11 +90,56 @@ Built in four steps (one chat each). Moved here from [../todo.md](../todo.md) on
     - Moved to step D: hundreds of moves in one poll; `arrange` reads the playlist a third time per build (enqueue's snapshot could be reused).
     - Left: a file whose URI VLC writes differently from `make_uri` gets no id and stays at the end (only a warning); measured equal for every test name. A `]]` in the test folder path would break the `Config` string.
   - Next: step C, the playlist rules: the "just opened" trigger, folder switch, duplicates and the refresh, deleted files.
-- [ ] **Step C: the playlist rules (answers 1–3)** (~300 lines)
-  - The "just opened" trigger, folder switch, no duplicates and the refresh, removal of deleted files, .m3u and several files opened at once.
-  - The refresh also fixes a step A gap: after the playlist was cleared, opening another file from the folder built last adds nothing (the folder still counts as built).
-  - Tests: switching folders, duplicate re-open, clicking within the playlist, an .m3u, several files on the command line.
+- [x] **Step C: the playlist rules (answers 1–3)** (done 2026-11-11; tested by the user)
+  - Planned ~300 lines, then ~450 in the step's plan; built ~600 (code ~240, tests ~360), plus docs.
+  - Choices (the user, step C questions; decisions.md, "Just opened in detail"):
+    - "Plays straight away" means the item starts within 10 s (`JUST_OPENED_S`) of becoming the last item. The first item to play after VLC starts always counts.
+    - "Newest" means the last item by position.
+    - Copies: the playing copy stays, otherwise the first one; the others go, the user's too.
+  - Built:
+    - `autofolder_core.lua`:
+      - `just_opened`: the three rules, returning the reason when it says no.
+      - `match_items`: matches the playlist's items to the scan; returns the copies and the items whose file is gone (confirmed by `stat`); sets `file.copies`. Other folders, subfolders and non-videos are left alone.
+    - `autofolder.lua`:
+      - Each poll reads `current()`, then the playlist, and notes since when the last item has been last.
+      - The "folder already built" exit is gone: a file just opened from the same folder refreshes it. That fixes the cleared-playlist gap.
+      - A switch scans the new folder first; only if that works, `leave_folder` removes the old folder's managed items and its opened file.
+      - If any copy of a file was the user's own item, the copy that stays is the user's too (from the review).
+      - New log lines: `folder X: 16 videos, 12 before and 3 after NAME; added 15, removed 0; 12 moves` and `left folder X: removed 16 items`.
+    - Tests:
+      - `test_core`: `just_opened` (7 cases) and `match_items` (copies, gone files, other folders, subfolders, case, dot-names, `file.copies`).
+      - `test_build`: also clicks the user's item.
+      - New driver `test_rules.lua` with the cases rules-switch, rules-refresh, rules-several, rules-m3u and rules-late (the last waits 11 s).
+      - Runner: a `LogMustNotMatch` field. `TestCommon.ps1`: `Season 2\Episode 2.mkv` and a `refresh\` folder (a, b, c), dated.
+  - Found (research/vlc-lua-api.md):
+    - Command-line files get their ids in reverse: the first file, which plays, has the highest id.
+    - An .m3u is replaced in place by its entries, and the first entry plays.
+    - Deleting up to 15 items that aren't playing keeps playback going.
+    - `clear()` stops playback.
+    - `vlc.io.unlink` exists; `vlc.io.open` with `"rb"`/`"wb"` copies a file.
+    - `run-tests.ps1 -File ... -Case a,b` passes `a,b` as one name; use `-Command` (CLAUDE.md).
+  - Tests:
+    - luacheck and PSScriptAnalyzer clean; run-tests.ps1 passes, 14 cases in ~57.5 s (measured, three runs).
+    - The user, in the portable test VLC with a window, passed all steps:
+      - Episode 2 opened: 16 items.
+      - Episode 1 opened again: one copy.
+      - `refresh\b.mkv`: switched to a, b, c.
+      - A click: no change.
+      - `playlist.m3u`: its 2 entries appended, no build.
+      - Episode 2 opened again: back to 16 items, no copies.
+  - Review (code-review, medium): 9 findings.
+    - Fixed:
+      - The user's own copy became managed when they re-opened the file, so a folder switch would have removed it.
+      - The test used `os.remove` as a fallback.
+      - A misleading failure message in `no_build`.
+      - A playlist read that did nothing.
+      - The README Status.
+    - Left, in decisions.md "Known gap": an item enqueued less than 10 s before playback reaches it builds.
+    - Left: an item whose file `stat` can't find is removed even if the user added it (the decision); nested items with `playlist-tree` on aren't matched (research note).
+    - Moved to step D: the playlist read on every poll and the ~5 reads per build.
+  - Next: step D, a 500-file folder and UNC paths.
 - [ ] **Step D: a 500-file folder without freezing, and UNC paths** (~150 lines)
   - Timing measured; if VLC stalls, spread the work over several polls. UNC via `\\localhost\C$`; the effect of `auto-preparse` on hundreds of items.
   - A folder that can't be read (a share that is briefly offline) is only logged, not retried; decide whether to retry it.
   - Also measure whether the build slows the start of the opened file: the build runs before VLC creates its input, and the preparsing of the added files runs alongside the opening (step A finding, research/vlc-lua-api.md "Playlist"). If it does, build only once the opened file plays.
+  - From the step C review: since step C, every poll reads the whole playlist (`get("playlist")`, to see how long the last item has been last), and a build reads it about 5 times (match, managed cleanup, enqueue twice, arrange). Measure both with a 500-item playlist; pass the item list along if it matters.

@@ -1,6 +1,7 @@
 --[[
 Helpers for autofolder.lua that don't change the playlist: paths and URIs,
-the video filter, natural name order, and the folder scan. Load with:
+the video filter, natural name order, the folder scan, and the decisions
+(when to build, which items to remove, the order to reach). Load with:
     local core = require "autofolder_core"
 Tests: tests\lua\intf\test_core.lua.
 
@@ -21,6 +22,10 @@ local video_set = {}
 for _, ext in ipairs(M.VIDEO_EXTENSIONS) do
     video_set[ext] = true
 end
+
+-- An item "plays straight away" when it starts at most this many seconds after
+-- it became the playlist's last item (docs/decisions.md).
+M.JUST_OPENED_S = 10
 
 -- Lower-cases ASCII letters only. string.lower depends on the C locale and
 -- could change the bytes of UTF-8 characters.
@@ -189,6 +194,73 @@ function M.scan_folder(folder)
         end
     end
     return files
+end
+
+-- Whether the item `id`, which just started playing, was just opened (a
+-- double-click, Open File, a drop onto the window), so its folder is built:
+--   - it was added after the previous item started: its id is above
+--     started_max, the highest id in the playlist then (ids only grow);
+--   - it is the playlist's last item (`last`): opened files are appended. The
+--     position, not the highest id, since VLC may number the files of its
+--     command line in another order;
+--   - it plays straight away: it has been the last item for at most
+--     JUST_OPENED_S seconds (`last_for_s`). The first item to play after VLC
+--     starts always counts (`first_play`): a cold start can take longer.
+-- Returns true, or false and the reason.
+function M.just_opened(id, last, started_max, last_for_s, first_play)
+    if id ~= last then
+        return false, "not the last item"
+    elseif id <= started_max then
+        return false, "added before the previous item started"
+    elseif not first_play and last_for_s > M.JUST_OPENED_S then
+        return false, string.format("added %.1f s before it started", last_for_s)
+    end
+    return true
+end
+
+-- Matches the playlist's items to the files of a folder scan: each file that an
+-- item plays gets that item's id (file.id). One item per file: the playing item
+-- `opened` wins, otherwise the first one in the playlist; the other copies'
+-- ids go into file.copies. Returns the ids to delete: those copies, and items
+-- in the folder whose file is gone.
+-- items: the playlist's items in order ({ id, path = URI }). folder: the
+-- folder's path. files: the scan ({ path, ... }, the opened file included).
+-- exists(path): true when the file is still there. Items in other folders
+-- (subfolders too) and non-videos are left alone; the opened item is never
+-- deleted.
+function M.match_items(items, folder, files, opened, exists)
+    local by_key = {}
+    for _, file in ipairs(files) do
+        by_key[M.path_key(file.path)] = file
+    end
+    local folder_key = M.path_key(folder)
+    local delete = {}
+    for _, item in ipairs(items) do
+        local path = M.uri_to_path(item.path)
+        local dir, name
+        if path then
+            dir, name = M.split_path(path)
+        end
+        if dir and M.path_key(dir) == folder_key and M.is_video(name) then
+            local file = by_key[M.path_key(path)]
+            if not file then
+                if item.id ~= opened and not exists(path) then
+                    delete[#delete + 1] = item.id
+                end
+            elseif not file.id then
+                file.id = item.id
+            else
+                local copy = item.id
+                if item.id == opened then
+                    copy, file.id = file.id, item.id -- the earlier copy goes
+                end
+                delete[#delete + 1] = copy
+                file.copies = file.copies or {}
+                file.copies[#file.copies + 1] = copy
+            end
+        end
+    end
+    return delete
 end
 
 -- The order the playlist should have once the folder is placed: the items
