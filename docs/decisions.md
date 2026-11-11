@@ -2,6 +2,24 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-11: The folder logic places files only by moving them to the front of the playlist node
+- **Reason:** VLC 3.0's Lua `playlist.move(id, target)` with an item as target computes the new place from item ids, not positions: wrong places, and a crash when the index falls out of range (measured; research/vlc-lua-api.md, "Playlist"). Moving into the playlist node (the item becomes first) works and keeps playback and Next/Previous right (measured).
+- **How:** enqueue the files after the playing one in order (appended); enqueue the files before it, then move each to the front, last one first.
+- **Who:** Claude, forced by the To do 1 step B measurement; for the user to confirm when To do 2 is built.
+- **Rejected:**
+  - `move` after an item: wrong place or a crash.
+  - `vlc.playlist.sort`: it reorders the user's whole playlist and has no natural or date-modified order.
+  - Deleting and re-adding the playing file in the right place: playback would restart.
+
+## 2026-11-11: Test VLCs also pass `--no-crashdump` and `--no-sub-autodetect-file`
+- **Reason:**
+  - A crashing test VLC wrote a crash dump into the real `%APPDATA%\vlc\crashdump`, despite the portable folder, and the next VLC start would ask to send it (measured). `--no-crashdump` (read by vlc.exe itself) stops that.
+  - With `Episode 1.srt` auto-loaded and no video output, the headless VLC took ~6 s to stop Episode 1.mkv, which made switch tests flaky (measured).
+- **Who:** Claude, while fixing the failures in To do 1 step B; reported to the user at hand-over.
+- **Rejected:**
+  - Deleting new crash dumps after each run: the tests would then write into the real folder on purpose.
+  - Renaming or removing `Episode 1.srt`: it's there to test that non-videos are ignored.
+
 ## 2026-11-10: The test VLC is the portable 3.0.24 zip in `tools\vlc`, with a `portable\` folder
 - **Reason:**
   - With a `portable` folder next to vlc.exe, VLC 3.0 keeps its settings and Lua user folder there (measured: `vlc.config.userdatadir()` returns it, and `%APPDATA%\vlc` stays unchanged).

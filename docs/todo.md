@@ -1,18 +1,15 @@
 # To-dos
 
 ## Where we are
-- Now: To do 1, step B (the API spike)
-- Next: To do 2, 3, 4, 5
-- Updated: 2026-11-10
+- Now: To do 2, step A (trigger, scan, sort, add later files)
+- Next: To do 3, 4, 5
+- Updated: 2026-11-11
 
 Next number: 6
 
 The requirements are in [spec.md](spec.md), and the API facts and open questions in [research/vlc-lua-api.md](research/vlc-lua-api.md).
 
 ## To do
-
-### 1. Skeleton and API check (medium, built in steps): "Confirm the 3.0.x Lua API details first instead of guessing function names"
-In its own file: [todo/01-skeleton.md](todo/01-skeleton.md) (Approach, answers and Progress list).
 
 ### 2. The interface script (large, built in steps): "When I open any single video, VLC automatically loads every other video in that folder, so Next/Previous work"
 - **Problem / Goal:** spec.md requirements 1–8.
@@ -26,7 +23,8 @@ In its own file: [todo/01-skeleton.md](todo/01-skeleton.md) (Approach, answers a
     - List the folder; keep video files only, no subfolders; stat each for mtime; sort (mtime oldest first for now).
     - Enqueue all missing files in one call.
     - Look up the new ids with `get("playlist")`.
-    - Move each one into place around the playing item.
+    - ~~Move each one into place around the playing item.~~ **Replaced (To do 1 step B):** VLC 3.0's `move` after an item is broken (wrong place or a crash). Files after the playing one: enqueue in order (appended). Files before it: enqueue, then move each to the front of the playlist node, last one first (decisions.md, 2026-11-11).
+  - URI to path: `vlc.strings.make_path` works for local files but drops a UNC server; `make_uri` equals VLC's own URIs (research/vlc-lua-api.md, measured).
   - State: the active folder, and the ids this script manages.
   - Log with the prefix `[autofolder]`: `info` for actions, `dbg` for details.
   - Steps:
@@ -38,7 +36,7 @@ In its own file: [todo/01-skeleton.md](todo/01-skeleton.md) (Approach, answers a
   - A file from a *different* folder starts playing while VLC runs. With default settings this is the common case: Explorer double-clicks reuse the open VLC and append. *Suggested:* remove the previous folder's items this script added, plus the file opened there; keep items you added yourself; then build the new folder.
   - An .m3u/.xspf or a hand-made mixed playlist is playing. *Suggested:* build only when the playing file is the newest item in the playlist and its folder isn't built yet. Then clicking items in your own playlist does nothing.
   - A file from the folder that's already loaded is opened again (VLC appends a duplicate). *Suggested:* keep one copy in its correct place, keep it playing, and add any new files that appeared in the folder since.
-  - Hidden files. *Suggested:* skip names starting with `.`; check whether Windows' hidden attribute is visible to Lua (probably not).
+  - Hidden files. *Suggested:* skip names starting with `.`. Windows' hidden attribute is **not** visible to Lua (measured in To do 1 step B: `stat` gives the same mode), so attribute-hidden files are included, as when VLC opens a folder itself.
   - Shuffle is on. *Suggested:* still build in sort order; VLC shuffles anyway.
 - **Test:**
   - Claude: headless tests per step:
@@ -88,7 +86,7 @@ In its own file: [todo/01-skeleton.md](todo/01-skeleton.md) (Approach, answers a
   - Both take a `-VlcDir` parameter, so tests can run them against a copy.
 - **Ask the user:**
   - Uninstall: restore the backup, or remove only our changes? *Suggested: only our changes; you may have changed other settings since.*
-  - `lua-intf` already used by another script? *Suggested: use the chain syntax if To do 1 shows it works; otherwise stop with a message.*
+  - `lua-intf` already used by another script? *Suggested: use the chain syntax (To do 1 measured that it works); otherwise stop with a message.*
 - **Test:**
   - Claude: install and uninstall against a copied vlcrc in a temp folder; the diff shows only our lines; encoding is unchanged; PSScriptAnalyzer is clean.
   - The user: a real install, double-click a video, then uninstall.
@@ -97,7 +95,8 @@ In its own file: [todo/01-skeleton.md](todo/01-skeleton.md) (Approach, answers a
 - **Problem / Goal:** spec.md deliverables 4 and 5, plus requirement 9: document what happens with one-instance mode on/off and enqueue mode on/off.
 - **Read first:** spec.md; the README as the earlier to-dos left it; research/vlc-lua-api.md (one-instance).
 - **Approach:**
-  - README: install, sort switch, troubleshooting (Tools → Messages, verbosity 2, filter `autofolder`), known limitations, and a one-instance behaviour table filled from real tests.
+  - README: install, sort switch, troubleshooting (Tools → Messages, verbosity 2, filter `autofolder`), known limitations, and a one-instance behaviour table filled from real tests (the headless results are in research/vlc-lua-api.md, "One-instance mode").
+    - Troubleshooting must say: a double-click only reaches VLC when VLC is the default app for the video type (on the dev PC, Windows Media Player was). A VLC opened from the Start menu doesn't receive double-clicks; each starts its own VLC (measured).
   - `docs/manual-test.md`:
     - middle, first and last file
     - Unicode names

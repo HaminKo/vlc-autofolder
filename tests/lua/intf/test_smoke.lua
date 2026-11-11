@@ -20,9 +20,8 @@ t.run(function()
     t.info("playing " .. item.path)
     t.check("it is the command-line file", item.path:match("/Episode%%202%.mkv$") ~= nil, item.path)
 
-    -- The generated test video really plays (its time moves on).
-    t.sleep(1)
-    local input = vlc.object.input()
-    local time = input and vlc.var.get(input, "time") or 0
-    t.check("playback time advances", time > 0, "time=" .. tostring(time))
+    -- The generated test video really plays (its time moves on). Opening it took
+    -- up to ~3 s on the first runs of a day (measured 2026-11-11), so wait.
+    local time = t.wait_for(function() return t.input_time() > 0 end, 5)
+    t.check("playback time advances", time, "time still 0 after 5 s")
 end)

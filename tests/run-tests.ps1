@@ -27,116 +27,30 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$root = Split-Path -Parent $PSScriptRoot
-$vlcExe = Join-Path $root 'tools\vlc\vlc.exe'
-# With this folder next to vlc.exe, VLC keeps its settings and Lua user folder there,
-# not in %APPDATA%\vlc. It must exist before VLC starts.
-$portable = Join-Path $root 'tools\vlc\portable'
-$testRoot = Join-Path ([IO.Path]::GetTempPath()) 'vlc-autofolder-tests'
-$media = Join-Path $testRoot 'media'
-# VLC finds %APPDATA% through the shell API, not the environment variable.
-$userVlc = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'vlc'
+# Paths ($root, $vlcExe, $media, $testRoot, $userVlc, ...) and the shared helpers.
+. (Join-Path $PSScriptRoot 'TestCommon.ps1')
 
 # Each case starts one VLC.
 #   Driver:       a script in tests\lua\intf (without .lua).
 #   Autofolder:   also load lua\intf\autofolder.lua (chain syntax).
-#   Files:        put on VLC's command line, like a double-click; relative to the media folder.
+#   Files:        put on VLC's command line, like a double-click; relative to the media folder,
+#                 or a full path.
 #   LogMustMatch: regexes that must each match a line of VLC's log.
+# The driver's config table (lua-config) holds: out (its results file), media (the media
+# folder), videos (the video list file, oldest first) and unc (the media folder as a UNC path).
 $cases = @(
     @{
         Name = 'smoke'; Driver = 'test_smoke'; Autofolder = $true; Files = @('Episode 2.mkv'); TimeoutSec = 20
         LogMustMatch = @('\[autofolder\] started', 'autofolder\.lua:\d+: Interrupted\.$')
     }
+    @{
+        # Every video plus one UNC path, so the playlist holds the URIs VLC makes itself.
+        Name = 'api'; Driver = 'test_api'; Files = $testVideos + @(Join-Path $uncMedia 'Episode 1.mkv'); TimeoutSec = 30
+    }
+    @{
+        Name = 'move'; Driver = 'test_move'; Files = @('episode 3.MP4'); TimeoutSec = 40
+    }
 )
-
-function Get-Y4mVideo {
-    # A 2-minute, 32x32, 1 frame/s raw video (YUV4MPEG2). VLC plays it whatever the file
-    # extension (its avcodec demuxer detects the format), so it serves as .mkv, .mp4, ...
-    $w = 32; $h = 32; $frames = 120
-    $stream = New-Object IO.MemoryStream
-    $header = [Text.Encoding]::ASCII.GetBytes("YUV4MPEG2 W$w H$h F1:1 Ip A1:1 C420jpeg`n")
-    $stream.Write($header, 0, $header.Length)
-    $frameHeader = [Text.Encoding]::ASCII.GetBytes("FRAME`n")
-    $frame = New-Object byte[] ($w * $h * 3 / 2)
-    for ($i = $w * $h; $i -lt $frame.Length; $i++) { $frame[$i] = 128 }  # grey chroma
-    for ($n = 0; $n -lt $frames; $n++) {
-        for ($i = 0; $i -lt $w * $h; $i++) { $frame[$i] = [byte](($n * 2) % 256) }  # brightness ramp
-        $stream.Write($frameHeader, 0, $frameHeader.Length)
-        $stream.Write($frame, 0, $frame.Length)
-    }
-    , $stream.ToArray()
-}
-
-function Initialize-TestFolder {
-    # The test folder. The names cover sorting, URI encoding and Unicode. The script is kept
-    # ASCII (PowerShell 5.1 reads a .ps1 without BOM as ANSI), so non-ASCII names use char codes.
-    $eAcute = [string][char]0x00E9
-    $japanese = -join [char[]]@(0x65E5, 0x672C, 0x8A9E)
-    $clapper = [char]::ConvertFromUtf32(0x1F3AC)
-    # Videos, oldest first: the date order is deliberately not the name order.
-    $videos = @(
-        'Episode 10.mkv'
-        'Episode 2.mkv'
-        'Episode 1.mkv'
-        'episode 3.MP4'
-        'hash # sign.mkv'
-        'percent 100% and %20 literal.mkv'
-        'a & b.mkv'
-        '[Group] Title [1080p].mkv'
-        "it's here.mp4"
-        'comma, here.avi'
-        'plus+equals=semi;colon.webm'
-        "caf$eAcute.mkv"
-        "$japanese.mkv"
-        "$clapper clip.mp4"
-        'double  space.mov'
-        '.dot-hidden.mkv'
-        'attribute-hidden.mkv'
-    )
-    # Not videos: must be ignored. Name and content.
-    $others = [ordered]@{
-        'Episode 1.srt' = "1`n00:00:00,000 --> 00:00:05,000`nsubtitle`n"
-        'cover.jpg'     = "not a picture`n"
-        'notes.txt'     = "notes`n"
-        'info.nfo'      = "info`n"
-        'playlist.m3u'  = "#EXTM3U`nEpisode 1.mkv`nEpisode 2.mkv`n"
-    }
-
-    if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
-    foreach ($dir in @($media, (Join-Path $media 'Season 2'), (Join-Path $testRoot 'results'), (Join-Path $testRoot 'logs'))) {
-        New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    }
-    $video = Get-Y4mVideo
-    $utf8 = New-Object Text.UTF8Encoding($false)
-    $time = New-Object DateTime 2026, 1, 1, 12, 0, 0  # local time, whole seconds
-    foreach ($name in $videos) {
-        $path = Join-Path $media $name
-        [IO.File]::WriteAllBytes($path, $video)
-        [IO.File]::SetLastWriteTime($path, $time)
-        $time = $time.AddHours(1)
-    }
-    $hidden = Join-Path $media 'attribute-hidden.mkv'
-    [IO.File]::SetAttributes($hidden, [IO.File]::GetAttributes($hidden) -bor [IO.FileAttributes]::Hidden)
-    foreach ($name in $others.Keys) {
-        $path = Join-Path $media $name
-        [IO.File]::WriteAllText($path, $others[$name], $utf8)
-        [IO.File]::SetLastWriteTime($path, $time)
-    }
-    [IO.File]::WriteAllBytes((Join-Path $media 'Season 2\Episode 1.mkv'), $video)  # in a subfolder: must be ignored
-}
-
-function Get-FolderSnapshot {
-    param([string]$Path)
-    # Always at least one line, so Compare-Object never gets an empty list.
-    if (-not (Test-Path -LiteralPath $Path)) { return '(missing)' }
-    '(exists)'
-    Get-ChildItem -LiteralPath $Path -Recurse -Force |
-        ForEach-Object { '{0}|{1}|{2:o}' -f $_.FullName, $_.Length, $_.LastWriteTimeUtc }
-}
-
-function Get-TestVlcProcess {
-    Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $vlcExe }
-}
 
 function Invoke-TestCase {
     # Runs one case; writes its report and returns $true when it passed.
@@ -145,17 +59,16 @@ function Invoke-TestCase {
     $log = Join-Path $testRoot "logs\$($Spec.Name).log"
     $intf = "luaintf{intf=$($Spec.Driver)}"
     if ($Spec.Autofolder) { $intf = "luaintf{intf=autofolder}:$intf" }
-    $luaConfig = '{0}={{out=[[{1}]],media=[[{2}]]}}' -f $Spec.Driver, $out, $media
-    $vlcArgs = @(
-        '-I', 'dummy', '--dummy-quiet'                                    # no window, no console
+    $luaConfig = '{0}={{out=[[{1}]],media=[[{2}]],videos=[[{3}]],unc=[[{4}]]}}' -f $Spec.Driver, $out, $media, $videoList, $uncMedia
+    $vlcArgs = (Get-HeadlessVlcArgumentList -Log $log) + @(
         '--no-one-instance', '--no-one-instance-when-started-from-file'   # never hand files to another VLC
-        '--no-media-library'                                              # don't write ml.xspf
-        '--vout', 'dummy', '--aout', 'dummy'
-        '--verbose=2', '--file-logging', "--logfile=`"$log`""
         '--extraintf', "`"$intf`""
         "--lua-config=`"$luaConfig`""
     )
-    foreach ($file in $Spec.Files) { $vlcArgs += '"' + (Join-Path $media $file) + '"' }
+    foreach ($file in $Spec.Files) {
+        if (-not [IO.Path]::IsPathRooted($file)) { $file = Join-Path $media $file }
+        $vlcArgs += '"' + $file + '"'
+    }
 
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $process = Start-Process -FilePath $vlcExe -ArgumentList $vlcArgs -PassThru -WindowStyle Hidden
@@ -201,10 +114,7 @@ function Invoke-TestCase {
 }
 
 # Preconditions
-if (-not (Test-Path -LiteralPath $vlcExe)) {
-    throw "No test VLC at $vlcExe. Run: powershell -ExecutionPolicy Bypass -File tests\setup-tools.ps1"
-}
-if (Get-TestVlcProcess) { throw "A test VLC ($vlcExe) is still running. Close it or end it in Task Manager." }
+Assert-TestVlc
 $ownVlcOpen = [bool](Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne $vlcExe })
 if ($ownVlcOpen) {
     Write-Host "Note: your own VLC is open. The tests don't touch it, but if it saves its settings meanwhile, the $userVlc check fails." -ForegroundColor Yellow
@@ -218,24 +128,7 @@ if ($Case) {
 
 $total = [Diagnostics.Stopwatch]::StartNew()
 $userVlcBefore = Get-FolderSnapshot $userVlc
-
-# Fresh portable folder with the current Lua files: lua\ and tests\lua\ merged.
-if (Test-Path -LiteralPath $portable) { Remove-Item -LiteralPath $portable -Recurse -Force }
-$portableLua = Join-Path $portable 'lua'
-New-Item -ItemType Directory -Force -Path $portableLua | Out-Null
-foreach ($source in @((Join-Path $root 'lua'), (Join-Path $root 'tests\lua'))) {
-    $prefix = (Get-Item -LiteralPath $source).FullName.TrimEnd('\') + '\'
-    Get-ChildItem -LiteralPath $source -Recurse -File | ForEach-Object {
-        if (-not $_.FullName.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Unexpected path $($_.FullName) outside $prefix"
-        }
-        $relative = $_.FullName.Substring($prefix.Length)
-        $target = Join-Path $portableLua $relative
-        if (Test-Path -LiteralPath $target) { throw "lua\ and tests\lua\ both have $relative" }
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
-        Copy-Item -LiteralPath $_.FullName -Destination $target
-    }
-}
+Initialize-PortableLua
 Initialize-TestFolder
 
 $failed = 0

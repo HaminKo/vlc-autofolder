@@ -4,8 +4,10 @@ Helpers for the test driver scripts (tests\lua\intf\test_*.lua). Load with:
 
 A driver is a Lua interface script that tests\run-tests.ps1 starts in a
 headless VLC. Its global `config` comes from the lua-config setting:
-    config.out    the results file to write
-    config.media  the test media folder
+    config.out     the results file to write
+    config.media   the test media folder
+    config.videos  a file listing the test videos, oldest first (read_lines)
+    config.unc     the media folder as a UNC path (\\localhost\C$\...)
 
 Results file, one line each:
     ok NAME | fail NAME: MESSAGE | info TEXT | done
@@ -78,6 +80,49 @@ function M.current_item()
         return nil
     end
     return vlc.playlist.get(id)
+end
+
+-- The playing input's time in microseconds, or 0 when nothing plays.
+function M.input_time()
+    local input = vlc.object.input()
+    return input and vlc.var.get(input, "time") or 0
+end
+
+-- The lines of a UTF-8 text file, without the line ends.
+function M.read_lines(path)
+    local file = vlc.io.open(path, "r")
+    if not file then
+        error("cannot read " .. tostring(path), 0)
+    end
+    local text = file:read("*a") or ""
+    file:close()
+    if text ~= "" and text:sub(-1) ~= "\n" then
+        text = text .. "\n" -- keep a last line that has no line end
+    end
+    local lines = {}
+    for line in text:gmatch("([^\r\n]*)\r?\n") do
+        lines[#lines + 1] = line
+    end
+    return lines
+end
+
+-- The items of the playlist node, in order (tables with id, name, path, ...).
+function M.playlist_items()
+    return vlc.playlist.get("playlist").children or {}
+end
+
+-- The decoded file name at the end of a URI.
+function M.file_name(uri)
+    return vlc.strings.decode_uri(uri):match("[^/]*$")
+end
+
+-- The playlist as "name | name | ...", names taken from the URIs.
+function M.playlist_names()
+    local names = {}
+    for _, item in ipairs(M.playlist_items()) do
+        names[#names + 1] = M.file_name(item.path)
+    end
+    return table.concat(names, " | ")
 end
 
 -- Runs the test body, records an uncaught error as a failure, writes "done"

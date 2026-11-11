@@ -2,7 +2,7 @@
 
 "Confirm the 3.0.x Lua API details first instead of guessing function names"
 
-Built in two steps (one chat each). Moved here from [../todo.md](../todo.md) on 2026-11-10.
+Built in two steps (one chat each). Moved here from [../todo.md](../todo.md) on 2026-11-10. **Finished 2026-11-11**; its entry in todo.md is removed, and this file stays as the record.
 
 - **Problem / Goal:**
   - The API facts in research/vlc-lua-api.md were read in the 3.0 source but never run.
@@ -72,10 +72,37 @@ Built in two steps (one chat each). Moved here from [../todo.md](../todo.md) on 
   - Answers (measured, in research/vlc-lua-api.md): portable isolation works; chain syntax runs two Lua interfaces side by side; `require` works from `intf\modules`; VLC closes ~0.05 s after quit while a script waits in `mwait` (logging one "Interrupted." error per close); `vlc.io.open` returns no value on failure.
   - Tests: luacheck and PSScriptAnalyzer clean; run-tests.ps1 passes (~2 s, measured). Negative checks: a crashing autofolder, a driver that never quits (killed at 20 s) and an unwritable results file are each reported as FAIL.
   - Review (code-review, medium): 10 findings, 8 fixed; left: the Y4M generator's speed (measured 56 ms, not worth it).
-- [ ] **Step B: the API spike** (~300 lines), next
-  - Add each test as a `$cases` entry in run-tests.ps1 plus a driver in `tests\lua\intf\`; the media folder already has every special name.
-  - `test_api.lua`: `vlc.net` present; `opendir` and `.`/`..`; `stat` on Unicode names; `make_uri` against VLC's own URIs for every special name, and decoding back to a path.
-  - `test_move.lua`: enqueue and move items around the playing one; it keeps playing (same id, time not reset); Next/Previous follow the new order.
-  - `tests\spike-one-instance.ps1`, run once: one-instance on/off × enqueue on/off, plus the command Explorer runs on a double-click (read from the registry).
-  - UNC: try `\\localhost\C$`.
-  - Every "Unverified" item in research/vlc-lua-api.md marked Measured or wrong.
+- [x] **Step B: the API spike** (done 2026-11-11; tested by the user)
+  - Planned: about 300 lines. Built: about 600 new lines plus 130 moved (the user agreed to keep it as one step).
+  - Built:
+    - `tests\TestCommon.ps1`:
+      - Holds the paths, test media, portable refresh, `%APPDATA%` snapshot and headless VLC options shared by the test scripts, moved out of run-tests.ps1 (moved first, with no behaviour change).
+      - The media setup now also writes `videos.txt` (names, oldest first) and a July-dated `summer.mkv` outside the media folder.
+    - run-tests.ps1:
+      - The cases `api` (every video plus one UNC path on the command line) and `move`.
+      - `Files` may hold full paths.
+      - lua-config passes `videos` and `unc`.
+    - `test_api.lua`: API presence, `opendir`, `stat` (dates, DST, hidden attribute), plain `io.open` vs `vlc.io.open`, `make_uri` against VLC's own URIs (command line, UNC, folder expansion), decoding back, and `make_path`.
+    - `test_move.lua`: the front-only move pattern around the playing item, Next/Prev, moving the playing item, and one demonstration of the id-formula bug with an in-range index.
+    - `tests\spike-one-instance.ps1` + `spike_one_instance.lua`: by hand only.
+      - Runs 5 cases.
+      - Prints Explorer's VLC commands from the registry.
+      - Stops if another VLC opens.
+      - Closes its own VLCs if stopped midway.
+    - testlib: `input_time`, `read_lines`, `playlist_items`, `file_name`, `playlist_names`.
+    - The smoke test waits up to 5 s for playback instead of 1 s.
+  - Answers (all in research/vlc-lua-api.md, measured; every "Unverified" item marked Measured or wrong):
+    - `move` after an item is broken in 3.0: the index comes from ids, so items land in the wrong place, or VLC crashes. Moves to the playlist node are fine. To do 2's approach was changed, see decisions.md.
+    - `opendir` returns `.`/`..`. `stat` works on Unicode and UNC paths with true Unix times, but can't see the hidden attribute. Plain `io.open` fails on non-ASCII names.
+    - `make_uri` equals VLC's own URIs. `make_path` exists but drops a UNC server.
+    - One-instance: a double-click into a running VLC appends and plays; "Add to playlist" only appends; a VLC from the Start menu doesn't receive double-clicks.
+    - On the dev PC, videos open in Windows Media Player by default.
+  - Incidents and fixes:
+    - A crashing test VLC wrote a dump into the real `%APPDATA%\vlc\crashdump`. It was moved out by hand, and test VLCs now pass `--no-crashdump`.
+    - The auto-loaded `Episode 1.srt` made the headless VLC stall ~6 s when switching files. Test VLCs now pass `--no-sub-autodetect-file`.
+    - Both are recorded in decisions.md.
+  - Tests:
+    - luacheck and PSScriptAnalyzer clean.
+    - run-tests.ps1 passes (3 cases, ~8 s, measured, several runs).
+    - The spike ran fully before the review fixes; its final version was not run by Claude (the user's VLC was open).
+  - Review (code-review, medium): 10 findings, 7 fixed (spike cleanup and per-case VLC check among them). Left: the deliberate id-formula demo, some process handling shared by both scripts, and UNC tested only via `\\localhost\C$` (noted in research).

@@ -19,14 +19,17 @@ Don't build what's under "Later" in docs/todo.md until asked.
 - Fast, after edits:
   - luacheck: `tools\luacheck.exe lua tests` (~0.1 s, measured)
   - PowerShell lint: `Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error` (~2 s, measured)
-- Once per step: `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1` (`-Case NAME` for one case). It runs the portable VLC in `tools\vlc` with no window, one VLC per case, and fails if `%APPDATA%\vlc` changed (~3 s with 1 case, measured; ~1.5 s per added case, estimated).
-- A test case = an entry in `$cases` in run-tests.ps1 + a driver `tests\lua\intf\test_*.lua` using `require "testlib"`. The runner also fails on any `lua error:` log line except the "Interrupted." that ends a script on exit.
+- Once per step: `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1` (`-Case NAME` for one case). It runs the portable VLC in `tools\vlc` with no window, one VLC per case, and fails if `%APPDATA%\vlc` changed (~8 s for 3 cases, measured).
+- A test case = an entry in `$cases` in run-tests.ps1 + a driver `tests\lua\intf\test_*.lua` using `require "testlib"`. The runner also fails on any `lua error:` log line except the "Interrupted." that ends a script on exit. Shared paths, test media and VLC options: `tests\TestCommon.ps1`.
+- By hand only, with every VLC closed: `tests\spike-one-instance.ps1` (one-instance hand-over; ~35 s, estimated).
 - No screenshot GUI test (see Decisions). The Qt parts are in the manual checklist (docs/manual-test.md, from To do 5).
 
 **Code rules** (from docs/research/vlc-lua-api.md):
 - Lua 5.1 only: no `goto`, no `//`, no `utf8` library.
 - File access goes through `vlc.io.*` (UTF-8 paths), not plain `io.open`.
 - Never catch the error that `vlc.misc.mwait` raises when VLC exits. The script must end then, or VLC can hang on close.
+- `vlc.playlist.move` only with the playlist node as target (the item becomes first). With an item as target VLC 3.0 picks the place from ids: wrong place or a crash.
+- `vlc.strings.make_path` drops the server of a UNC path; convert UNC URIs yourself.
 - Tests never touch the real `%APPDATA%\vlc`.
 - vlcrc is UTF-8 with BOM and LF line endings: edit it with .NET file APIs, never `Set-Content`, and only while VLC is closed.
 
@@ -47,7 +50,7 @@ Now and next: the "Where we are" block at the top of docs/todo.md.
 Reasons, who decided, and what was rejected: docs/decisions.md.
 - The core is a Lua interface script loaded at startup via the extra-interface setting (not an extension, not a playlist script).
 - Tests run the real VLC 3.0.24 with no window, isolated from the real settings; there is no screenshot GUI test.
-- The test VLC is the portable zip in `tools\vlc` with a `portable\` folder; test runs always pass `--no-one-instance`.
+- The test VLC is the portable zip in `tools\vlc` with a `portable\` folder; test runs always pass `--no-one-instance` and `--no-crashdump`.
 - Public on GitHub later.
 
 ## Project docs
