@@ -28,6 +28,7 @@ Don't build what's under "Later" in docs/todo.md until asked.
 - Lua 5.1 only: no `goto`, no `//`, no `utf8` library.
 - File access goes through `vlc.io.*` (UTF-8 paths), not plain `io.open`.
 - Never catch the error that `vlc.misc.mwait` raises when VLC exits. The script must end then, or VLC can hang on close.
+- Extensions: the top level only defines functions and calls `require` (VLC's startup scan runs it with no libraries); read a dropdown pre-set with `set_text` via `get_text()`, not `get_value()`; label text is rich text (escape `<`, `>`, `&`).
 - `vlc.playlist.move` only with the playlist node as target (the item becomes first). With an item as target VLC 3.0 picks the place from ids: wrong place or a crash.
 - `vlc.strings.make_path`, and VLC itself, drop the server `localhost` (taken as this PC); convert URIs with `core.uri_to_path`, and use `\\127.0.0.1\C$` for UNC tests.
 - Tests never touch the real `%APPDATA%\vlc`.
@@ -56,6 +57,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - Only a file just opened builds: the playlist's last item (by position, not id), started within 10 s of becoming last (the first play after VLC starts always counts). One copy per folder file.
 - A build runs whole, in one poll, at once (measured fast for 500 files); a folder that can't be read is logged, not retried.
 - Settings (sort order, video types) live in `autofolder.ini` in `vlc.config.userdatadir()`, shared code in `lua\modules\`; read about every second, a change applied when two reads agree; the interface script never creates the file.
+- The settings dialog (View → Auto Folder Playlist settings, an extension) rewrites the whole file on Save and closes; a wrong type is refused in the dialog.
 - VLC 3.0's playlist window doesn't show a script's moves: a re-sort deletes and re-adds the script's items (not the playing one).
 
 ## Project docs

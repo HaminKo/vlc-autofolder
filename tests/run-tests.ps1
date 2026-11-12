@@ -93,6 +93,11 @@ $cases = @(
         )
         LogMustNotMatch = @('\[autofolder\] autofolder\.ini line')
     }
+    @{
+        # The settings dialog (lua\extensions\), with a stand-in for VLC's dialog API.
+        Name = 'dialog'; Driver = 'test_dialog'; Files = @(); TimeoutSec = 20
+        LogMustMatch = @('\[autofolder\] dialog: saved sort name-az; video types mp4 mkv$')
+    }
     # Building the folder from the first, a middle and the last video by date (16 videos, the
     # dot-name not counted), and from the dot-named one, which the scan itself skips. The move
     # counts are the fewest moves to the front for each case.

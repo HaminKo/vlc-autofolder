@@ -162,8 +162,13 @@ function M.write(values, path)
     if not file then
         return nil, "cannot write " .. path
     end
-    file:write(M.format(values))
+    -- write gives false when nothing was written; a failure inside close
+    -- (e.g. a full disk) can't be seen: close returns nothing.
+    local ok = file:write(M.format(values))
     file:close()
+    if not ok then
+        return nil, "cannot write " .. path
+    end
     return true
 end
 

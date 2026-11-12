@@ -7,16 +7,18 @@ When you open a single video file in VLC 3.0 on Windows (for example by double-c
 ## Status
 In development. Built for VLC 3.0.24 on Windows 11. What works so far:
 - Opening a video (double-click, Open File, or dropping it on the window) adds the other videos of its folder, before and after it, in the sort order you chose (date modified, oldest first, unless you change it). Items you added to the playlist yourself keep their places.
-- The sort order and the video file types are set in a small settings file (see below); a new sort order re-sorts the playlist within about two seconds, without restarting VLC.
+- The sort order and the video file types are set in a dialog (View menu) or a small settings file (see below); a new sort order re-sorts the playlist within about two seconds, without restarting VLC.
 - Opening a video from another folder replaces the previous folder's videos with the new folder's; your own items stay.
 - Opening a video of the same folder again leaves one copy of each file, adds new files, and removes items whose file was deleted.
 - Clicking an item, Next and Previous never change the playlist. Neither does opening several files at once or an .m3u playlist.
 - Large folders and network paths (`\\server\share\...`) work. In tests, a folder of 500 videos was in place within about half a second, and the file didn't start later. Network paths were tested through a share on the same PC; a real network share and mapped drives are still to be checked by hand.
 
-The install script and a View-menu dialog for the settings are still to come.
+The install script is still to come.
 
 ## Sort order and video types
-The settings are in `autofolder.ini` in VLC's user folder (`%APPDATA%\vlc\autofolder.ini`). Without the file, the defaults apply. To change them, create or edit it in Notepad, for example:
+In VLC, choose **View → Auto Folder Playlist settings**. The dialog has the sort order and the video file types (separated by spaces; leave the field empty for the default list). **Save** applies them within about two seconds, without restarting VLC; **Cancel** (or closing the window) changes nothing. A wrong value in the settings file shows as a note in the dialog.
+
+The dialog saves to `autofolder.ini` in VLC's user folder (`%APPDATA%\vlc\autofolder.ini`). Without the file, the defaults apply. You can also edit it in Notepad (for example with the Skins interface, which has no View menu), but the dialog's Save rewrites the whole file, so comments you typed there are lost. An example:
 ```ini
 # sort: date-oldest, date-newest, name-az or name-za
 sort=name-az
@@ -31,6 +33,8 @@ extensions=mp4 mkv avi
 ## Troubleshooting
 - **See what the script did:** Tools → Messages, verbosity 2 (debug). Its lines start with `[autofolder]`. After each build, one line gives the number of videos and how long it took, e.g. `folder D:\Shows\: 24 videos, 4 before and 19 after Episode 05.mkv; added 23, removed 0; 4 moves; 3 ms (scan 2 ms)`.
 - **Settings not applied:** at start, and after each change of the settings file, one line shows the settings in use and where it looked for the file, e.g. `settings: sort name-az; video types mp4 mkv avi (from C:\Users\you\AppData\Roaming\vlc\autofolder.ini)`, or `(defaults: no file ...)` when it found none. Check the file name: Notepad may have saved it as `autofolder.ini.txt`.
+- **No "Auto Folder Playlist settings" in the View menu:** `autofolder_dialog.lua` must be in `%APPDATA%\vlc\lua\extensions\`; then restart VLC. A script VLC couldn't load shows in Tools → Messages as `Error loading script ...autofolder_dialog.lua`.
+- **The menu entry opens nothing:** `autofolder_settings.lua` must be in `%APPDATA%\vlc\lua\modules\`. Tools → Messages then shows `module 'autofolder_settings' not found`.
 - **"cannot read the folder":** the folder couldn't be listed, for example a network share that was briefly offline. The script doesn't retry: open the file again.
 
 ## Limitations

@@ -1,8 +1,8 @@
 # To-dos
 
 ## Where we are
-- Now: To do 3, step B (the sort dialog)
-- Next: To do 6, 4, 5
+- Now: To do 6 (re-opened file shown at the bottom)
+- Next: To do 4, 5
 - Updated: 2026-11-11
 
 The requirements are in [spec.md](spec.md), and the API facts and open questions in [research/vlc-lua-api.md](research/vlc-lua-api.md).
@@ -11,10 +11,9 @@ The requirements are in [spec.md](spec.md), and the API facts and open questions
 Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to-do, move its line.
 
 ### Now
-- To do 3: Sort-order switch (medium): docs/todo/03-sort-switch.md
+- To do 6: Playlist window shows a re-opened file at the bottom (medium): docs/todo/06-reopen-at-bottom.md
 
 ### Bugs me
-- To do 6: Playlist window shows a re-opened file at the bottom (medium): docs/todo/06-reopen-at-bottom.md
 - To do 4: Install and uninstall scripts (medium): docs/todo/04-install-scripts.md
 - To do 5: README and manual test checklist (small): docs/todo/05-readme-manual-test.md
 

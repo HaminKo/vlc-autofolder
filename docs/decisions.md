@@ -2,6 +2,21 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-11: The settings dialog: "Auto Folder Playlist settings", Save closes, the file is rewritten
+- **Rule:**
+  - The View-menu entry is "Auto Folder Playlist settings"; the dialog's title is "Auto Folder Playlist".
+  - The dialog has a sort dropdown, a video-types field, Save and Cancel. Save writes the file and closes the dialog; Cancel, X and Escape close it without writing.
+  - A word in the types field that isn't a file type: nothing is saved, a red note names it, and the dialog stays open. An empty field saves the default list.
+  - Save rewrites the whole file in the standard layout (`settings.format`), so comments typed by hand are lost.
+  - A wrong value in the file, or a file that can't be read: a note in the dialog, with the default shown in that field.
+  - The dropdown is read with `get_text()`, not `get_value()` (VLC 3.0 bug: research/vlc-lua-api.md, "Extensions and dialogs").
+- **Reason:** the plain name "Auto Folder Playlist" reads like a command that builds a playlist (as the "Add similar files from folder" add-on does), but the entry only opens the settings. Save-and-close is the usual settings dialog. Refusing a wrong type keeps the user's typing so it can be fixed.
+- **Who:** the user, accepting Claude's suggestions (To do 3 step B questions).
+- **Rejected:**
+  - Keeping the user's other lines and comments when saving: ~25 more lines and tests for a rare case.
+  - An Apply button that keeps the dialog open: more buttons for trying orders, which takes two clicks through the View menu anyway.
+  - Saving only the valid types and dropping the wrong ones silently.
+
 ## 2026-11-11: A re-sort deletes and re-adds the folder's items instead of moving them
 - **Rule:** when the sort order changes, the active folder's items that the script added are deleted and enqueued again in the new order, then placed with front moves as in a build.
   - The playing item stays, since re-adding it would restart it.
@@ -23,7 +38,7 @@ One entry per decision, newest first. Each entry has the date and the decision a
   - The settings are in `autofolder.ini` in VLC's user folder (`vlc.config.userdatadir()`, `%APPDATA%\vlc`): `sort=` one of `date-oldest` (default), `date-newest`, `name-az`, `name-za`, and `extensions=` the video types. A wrong value is logged as a warning and that line's default is used. The interface script never creates the file.
   - The interface script reads the file at start and about every second, comparing its contents. A changed text is applied when the next read gives it again (so a file read while being saved is never used); the first read is applied at once. A sort change re-sorts the active folder's items at once (reorder only, by re-adding them: see "A re-sort deletes and re-adds" above; the playing file keeps playing). A change of the video types applies at the next file opened.
   - Newest first breaks equal dates by name A→Z; name orders are natural order.
-  - A companion extension (View → Auto Folder Playlist, To do 3 step B) writes the same file. The settings code is shared in `lua\modules\autofolder_settings.lua`.
+  - A companion extension (View → Auto Folder Playlist settings, To do 3 step B; see "The settings dialog" above) writes the same file. The settings code is shared in `lua\modules\autofolder_settings.lua`.
 - **Reason:** a switch inside VLC without a restart, and a file that also works without the dialog (Skins interface, or editing by hand). The contents are compared rather than the file time, because `stat` times count whole seconds, so two saves within one second could be missed. The second read was added after the step A code review: the dialog and Notepad both empty the file before writing it, and a read in between would re-sort twice and warn about a cut-off value.
 - **Who:** the user, accepting Claude's suggestions (To do 3 questions).
 - **Rejected:**

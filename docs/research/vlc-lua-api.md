@@ -31,7 +31,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
 - No change callbacks: `vlc.var.add_callback` is not in the 3.0 README (only `var.trigger_callback`). The script must **poll**, e.g. `vlc.playlist.current()` every 300–500 ms. **Measured 2026-11-11:** `vlc.var.add_callback` is nil.
 - Modules: VLC's own `cli` interface loads `require "host"` from `lua\intf\modules\`. So a helper module in `lua\intf\modules\` should load with `require`. **Measured 2026-11-10: works**, from the user folder too. `package.path` lists, in order: the user `lua\modules\` and `lua\intf\modules\`, then the same two in VLC's own `lua\` folder (`?.luac`, `?.lua`, `?.vle` each).
   - **Measured 2026-11-11 (To do 3 step A):** a module in the user `lua\modules\` (`autofolder_settings`) loads with `require` from an interface script, and from a module in `lua\intf\modules\` that the script loaded.
-  - For an extension script (`lua\extensions\`), the 3.0 source (`vlclua_add_modules_path` in modules/lua/vlc.c) adds the script folder's parent `lua\modules\` and `lua\extensions\modules\` the same way, so a shared module goes in `lua\modules\`. **Source only:** to be measured in To do 3 step B.
+  - For an extension script (`lua\extensions\`), the 3.0 source (`vlclua_add_modules_path` in modules/lua/vlc.c) adds the script folder's parent `lua\modules\` and `lua\extensions\modules\` the same way, so a shared module goes in `lua\modules\`. ~~**Source only:** to be measured in To do 3 step B.~~ **Measured 2026-11-11 (To do 3 step B manual test):** the dialog in the user `lua\extensions\` loads `autofolder_settings` from the user `lua\modules\` with `require`.
 
 ## Files and folders (source: libs/net.c, README)
 - **`vlc.net.stat(path)`** takes a local path, not a URI. It returns nil on failure; otherwise a table with:
@@ -65,6 +65,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
   - When it can't open the file (a folder that doesn't exist), it returns **no value at all**, not `nil` plus a message like Lua's `io.open`. So `assert(vlc.io.open(...))` only says "bad argument #1 to 'assert' (value expected)"; check the result and raise your own message.
   - **Measured 2026-11-11 (To do 2 step C, test_rules.lua):** modes `"rb"` and `"wb"` with `read("*a")` copy a 185 KB video (the copy was scanned and enqueued as a video; its bytes weren't compared). **`vlc.io.unlink(path)`** exists and deletes a file.
   - **Measured 2026-11-11 (To do 3 step A, test_settings.lua):** `vlc.io.open(folder, "rb")` on a folder that exists also returns no value. So "no value" alone doesn't tell a missing file from one that can't be read; `autofolder_settings.read` asks `vlc.net.stat` then.
+  - **Source (3.0.24 libs/io.c, read 2026-11-11, To do 3 step B):** `file:write(...)` returns a boolean (false when `fwrite` wrote nothing); `file:flush()` and `file:close()` return nothing, so an error at close (e.g. a full disk) can't be seen.
   - A settings file rewritten while VLC runs was picked up within the 5 s the test allows each time (read every ~1 s, compared by text). How long one read takes wasn't measured; it is a ~200-byte file.
 
 ## Strings and URIs (source: README)
@@ -205,6 +206,25 @@ Found in To do 1 step B (measured 2026-11-11):
 - Timing of the 8 cases after To do 2 step A: ~20 s per run (measured 2026-11-11, warm).
 - Timing of the 16 cases after To do 2 step D: 65.7 s (one run, measured 2026-11-11); `build-big` takes 2.7 s, plus 0.6–0.8 s to make its 500 files (measured in the spike).
 
+## Extensions and dialogs (source: VLC 3.0.24, read 2026-11-11 for To do 3 step B)
+Files: modules/lua/extension.c, extension_thread.c, libs/dialog.c, modules/gui/qt/dialogs/extensions.cpp, modules/gui/qt/extensions_manager.cpp (all identical on the 3.0.x branch and the 3.0.24 tag).
+- **The startup scan runs the script in a bare Lua state:** `luaL_newstate()` with no standard libraries and no `vlc` table, and `require` replaced by a function that returns nothing. Then it calls only `descriptor()`. So the script's top level may only define functions and call `require` (which gives nil there); `descriptor()` may only build a table. Any library use at the top level makes the scan fail, and the extension is missing from the View menu (logged as "Error loading script").
+- **On activation** the script runs again in a fresh state with the standard libraries, `vlc.*` (including `dialog`, `config`, `io`, `msg`, `net`), `vlc.deactivate` and `vlc.keep_alive`, and the module path of `vlclua_add_modules_path` (so `require` of `lua\modules\` works; see "Modules" above). Deactivation runs `deactivate()` and then closes the state, so every activation starts fresh.
+- **View menu:** the entry is checkable while the extension is active; clicking an active extension deactivates it.
+- **`close()`** is called when the dialog's window is closed (X button or Escape).
+- **One dialog per extension** ("Only one dialog allowed per extension!"); the dialog is deleted when the state is closed (`__gc`).
+- **Dropdown selection bug:** `add_value(text, id)` appends; the first value added is marked selected. `set_text(text)` before the dialog is first shown makes Qt show the entry with that text, but the combo's change signal is connected only after that, so the selected mark stays on the first value: **`get_value()` then returns the first value until the user picks another one.** `get_text()` returns the shown text in both cases (the `set_text` text, or after a pick the combo's current text). So read a dropdown with `get_text()` when it was pre-set with `set_text`. A `set_text` after the dialog is shown doesn't change the shown entry (Qt's update of a dropdown only adds missing values).
+- `get_text()` of a text input returns its current text (Qt syncs it on every change).
+- **Labels are always rich text** (`setTextFormat(Qt::RichText)`): `<`, `>` and `&` in a label's text must be escaped, a line break is `<br>` (not `\n`), and `<span style="color:...">` colours it.
+- Size hints (`width`, `height`) only call `resize()` when both are given, and the grid layout decides the size anyway; a wide label widens the dialog.
+- Widgets are created when the function that made them returns (or at `d:update()`), so a dialog built inside `activate()` is created with all its values and texts.
+- **Measured 2026-11-11 (To do 3 step B manual test, the windowed test VLC):**
+  - The entry appears in the View menu, and it has a check mark while the dialog is open.
+  - A dropdown pre-set with `set_text` shows that entry, and Save without a pick kept it, through `get_text()`. `get_value()`'s wrong answer is still source only: it wasn't run in the real VLC.
+  - An escaped `<` in a label shows as `<`, and `<span style="color:...">` colours the text.
+  - Escape calls `close()`.
+  - Not tested: clicking the menu entry while the dialog is open.
+
 ## Prior art (searched 2026-11-10)
 - No ready-made auto-starting interface script for VLC 3 was found.
 - Existing VLC add-ons are extensions that need a menu click each session, such as "Add similar files from folder" on store.kde.org, or wrapper scripts such as vlc_autoPlaylist (Bash/AppleScript).
@@ -218,5 +238,6 @@ Found in To do 1 step B (measured 2026-11-11):
 - modules/lua/intf.c: https://raw.githubusercontent.com/videolan/vlc/3.0.x/modules/lua/intf.c
 - src/win32/specific.c (one-instance sender): https://raw.githubusercontent.com/videolan/vlc/3.0.x/src/win32/specific.c
 - modules/control/win_msg.c (one-instance receiver): https://raw.githubusercontent.com/videolan/vlc/3.0.x/modules/control/win_msg.c
+- Extensions (3.0.24 tag): https://raw.githubusercontent.com/videolan/vlc/3.0.24/modules/lua/extension.c, .../modules/lua/extension_thread.c, .../modules/lua/libs/dialog.c, .../modules/gui/qt/dialogs/extensions.cpp, .../modules/gui/qt/extensions_manager.cpp
 - "Add similar files from folder" add-on: https://store.kde.org/p/1153993
 - vlc_autoPlaylist: https://github.com/PhoenixWhitebrow/vlc_autoPlaylist

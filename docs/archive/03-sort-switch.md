@@ -46,7 +46,18 @@ Built in two steps (one chat each). Moved here from [../todo.md](../todo.md) on 
     - `autofolder.lua`: reads the file at start and every ~1 s (contents compared: file times count whole seconds); logs a change or warnings once; keeps the last build's files; a sort change re-sorts them with `arrange`.
     - Tests: `test_core` (orders, ties, a custom list); new driver `test_settings.lua` (parse, format, round trip); cases settings-live and settings-ext; a `Settings` field in run-tests.ps1 writes `tools\vlc\portable\autofolder.ini`.
     - Docs: README (switching by hand), research (module paths), decisions.
-- [ ] **Step B: the dialog** (View → Auto Folder Playlist)
-  - `lua\extensions\autofolder_dialog.lua`: a sort dropdown, a video-types field, Save / Cancel; uses `autofolder_settings`.
-  - A load test with a stand-in dialog (catches typos, checks Save writes the file). The real dialog is the user's test.
-  - Questions for that chat: the dialog's details (e.g. whether Save closes it).
+- [x] **Step B: the dialog** (View → Auto Folder Playlist settings) (2026-11-11)
+  - Built: `lua\extensions\autofolder_dialog.lua` (sort dropdown, video-types field, Save / Cancel). `autofolder_settings.write` now reports a failed write.
+  - The user's choices (decisions.md "The settings dialog"):
+    - The menu entry is renamed to "... settings".
+    - Save closes the dialog.
+    - A wrong type is refused with a red note.
+    - Save rewrites the whole file.
+    - Wrong values in the file show as a note.
+  - Found in VLC's source (research "Extensions and dialogs"):
+    - The startup scan runs the script with no libraries.
+    - `get_value()` is wrong after `set_text`, so the dialog reads `get_text()`.
+    - Labels are rich text.
+  - Test: the `dialog` case, with a stand-in dialog API that copies VLC's behaviour, including the bare scan and the dropdown bug. Two deliberately broken versions of the dialog failed it, as they should.
+  - The code review fixed 5 of 10 points. Left: a test path with `&`, a monkeypatch restore, the shared module table in the stand-in, a partly redundant log check, and file helpers copied across test drivers.
+  - The user's manual test (9 steps, windowed test VLC) passed.
