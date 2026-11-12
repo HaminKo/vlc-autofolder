@@ -11,12 +11,14 @@ and picks the scenario with config.scenario:
          one item, as a user would. Then it rewrites the file (date-newest by
          hand, name-az as the dialog writes it, then a wrong value, which
          gives the default date-oldest): each time the folder is re-sorted,
-         the other items are added again (new ids: VLC's playlist window
-         doesn't show moves), the deleted one stays out, and Episode 2.mkv
+         the items that must move are added again (new ids: VLC's playlist
+         window doesn't show moves) and the others keep their order
+         (testlib.kept_order), the deleted one stays out, and Episode 2.mkv
          keeps playing. Next then plays the item after it in the new order.
          Last, the driver adds two items of its own after the folder (a
          file from Season 2\ and vlc://nop), plays the first, and switches
-         to name-az: the folder is re-added whole and stays before them.
+         to name-az: the folder is re-sorted and stays before them, and
+         they keep their ids.
 - types: autofolder, with the file setting the video types to mp4 and avi,
          and it's here.mp4 on the command line: only the mp4 and avi files
          are added. Then Episode 1.mkv is opened: no build, it isn't a video
@@ -149,10 +151,7 @@ function scenarios.live()
         { label = "a wrong value: the default", text = "sort=sideways\n", order = "date-oldest" },
     }
     for _, change in ipairs(changes) do
-        local before = 0
-        for _, item in ipairs(t.playlist_items()) do
-            before = math.max(before, item.id)
-        end
+        local shown = t.playlist_ids()
         if change.values then
             t.equal(change.label .. ": written", settings.write(change.values), true)
         else
@@ -162,13 +161,8 @@ function scenarios.live()
             return
         end
         t.still_plays(change.label, playing.id)
-        local old = {}
-        for _, item in ipairs(t.playlist_items()) do
-            if item.id ~= playing.id and item.id <= before then
-                old[#old + 1] = t.file_name(item.path)
-            end
-        end
-        t.equal(change.label .. ": the other items were added again (new ids)", table.concat(old, " | "), "")
+        -- How many were added again: the runner checks autofolder's log.
+        t.kept_order(change.label, shown)
     end
 
     -- Next plays the item after Episode 2.mkv in the new order.
@@ -204,10 +198,13 @@ function scenarios.live()
         return
     end
     t.expect("the user's item playing: no build", folder_then_own)
+    local shown = t.playlist_ids()
     write_text("sort=name-az\n")
     t.expect("a user's item playing, name-az: re-sorted, the folder in its place",
         media_folder("name-az", gone) .. " | Episode 1.mkv | nop")
     t.still_plays("the user's item", own.id)
+    local kept = t.kept_order("a user's item playing, name-az", shown)
+    t.check("the user's items kept their ids", kept:sub(-#"Episode 1.mkv | nop") == "Episode 1.mkv | nop", kept)
 end
 
 function scenarios.types()

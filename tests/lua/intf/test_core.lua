@@ -158,25 +158,80 @@ t.run(function()
         end
         return table.concat(list, " ")
     end
-    -- { label, current playlist, folder in sort order, expected order, expected moves }
+    -- { label, current playlist, folder in sort order, expected order, expected moves, anchor }
     local arrangements = {
         { "already in order", { 1, 2, 3 }, { 1, 2, 3 }, "1 2 3", 0 },
-        { "opened in the middle", { 3, 1, 2, 4, 5 }, { 1, 2, 3, 4, 5 }, "1 2 3 4 5", 2 },
-        { "opened last", { 5, 1, 2, 3, 4 }, { 1, 2, 3, 4, 5 }, "1 2 3 4 5", 4 },
+        { "opened in the middle", { 3, 1, 2, 4, 5 }, { 1, 2, 3, 4, 5 }, "1 2 3 4 5", 2, 3 },
+        { "opened last", { 5, 1, 2, 3, 4 }, { 1, 2, 3, 4, 5 }, "1 2 3 4 5", 4, 5 },
         { "user items before the folder stay before it", { 91, 92, 3, 1, 2, 4, 5 }, { 1, 2, 3, 4, 5 },
-            "91 92 1 2 3 4 5", 4 },
-        { "a user item inside the folder goes after it", { 1, 91, 2, 3, 92 }, { 1, 2, 3 }, "1 2 3 91 92", 3 },
+            "91 92 1 2 3 4 5", 4, 3 },
+        { "no anchor: a user item inside the folder goes after it", { 1, 91, 2, 3, 92 }, { 1, 2, 3 },
+            "1 2 3 91 92", 3 },
+        { "an anchor not in the folder: as no anchor", { 1, 91, 2, 3, 92 }, { 1, 2, 3 }, "1 2 3 91 92", 3, 91 },
+        { "anchored in the middle: the user's items before and after it", { 1, 91, 2, 3, 92 }, { 1, 2, 3 },
+            "91 1 2 3 92", 1, 2 },
+        { "re-opened last: the folder goes to the end, after the user's item", { 1, 3, 4, 91, 22 },
+            { 1, 22, 3, 4 }, "91 1 22 3 4", 3, 22 },
         { "a folder id not in the playlist is left out", { 3, 1 }, { 1, 2, 3 }, "1 3", 1 },
         { "an empty playlist", {}, {}, "", 0 },
     }
     each("target_order and front_moves", arrangements, function(case)
         local label, current, folder, want, want_moves = case[1], case[2], case[3], case[4], case[5]
-        local target = core.target_order(current, folder)
+        local target, before, after = core.target_order(current, folder, case[6])
         local moves = core.front_moves(current, target)
         local got = apply(current, moves)
-        local message = string.format("%s: target %s, after the moves %s, %d moves",
-            label, table.concat(target, " "), got, #moves)
-        return table.concat(target, " ") == want and got == want and #moves == want_moves, message
+        local parts = table.concat(before, " ") .. " / " .. table.concat(after, " ")
+        local message = string.format("%s: target %s, after the moves %s, %d moves, before / after %s",
+            label, table.concat(target, " "), got, #moves, parts)
+        -- before and after are the target's ends: the user's items.
+        local ends = #before + #after <= #target
+        for i, id in ipairs(before) do
+            ends = ends and target[i] == id
+        end
+        for i, id in ipairs(after) do
+            ends = ends and target[#target - #after + i] == id
+        end
+        return table.concat(target, " ") == want and got == want and #moves == want_moves and ends, message
+    end)
+
+    -- keep_in_order: { label, current, target, fixed ids, expected ids that stay (in current order),
+    -- true if fixed items are out of order (then the items that stay may not be in target's order) }.
+    -- 22 and 44 are new copies of 2 and 4 (re-opened); 91, 92 are the user's items.
+    local keeps = {
+        { "the user's report: Episode 2 re-opened, last", { 1, 3, 4, 5, 22 }, { 1, 22, 3, 4, 5 }, { 22 }, "1 22" },
+        { "re-opened, the next to last by sort", { 1, 2, 3, 5, 44 }, { 1, 2, 3, 44, 5 }, { 44 }, "1 2 3 44" },
+        { "already in order: all stay", { 1, 2, 3 }, { 1, 2, 3 }, { 2 }, "1 2 3" },
+        { "a folder item on the other side of a user's item can't stay", { 1, 91, 2, 3 }, { 91, 1, 2, 3 },
+            { 91, 3 }, "91 2 3" },
+        { "reversed: only the fixed item stays", { 1, 2, 3, 4 }, { 4, 3, 2, 1 }, { 2 }, "2" },
+        { "nothing fixed: the longest run in order", { 3, 1, 2, 5, 4 }, { 1, 2, 3, 4, 5 }, {}, "1 2 4" },
+        { "fixed items out of order both stay; nothing fits between", { 91, 2, 92 }, { 92, 2, 91 }, { 91, 92 },
+            "91 92", true },
+        { "an empty playlist", {}, {}, {}, "" },
+    }
+    each("keep_in_order", keeps, function(case)
+        local label, current, target, want = case[1], case[2], case[3], case[5]
+        local fixed = {}
+        for _, id in ipairs(case[4]) do
+            fixed[id] = true
+        end
+        local keep = core.keep_in_order(current, target, fixed)
+        local stay, in_target = {}, {}
+        for _, id in ipairs(current) do
+            if keep[id] then
+                stay[#stay + 1] = id
+            end
+        end
+        for _, id in ipairs(target) do
+            if keep[id] then
+                in_target[#in_target + 1] = id
+            end
+        end
+        local got = table.concat(stay, " ")
+        -- The items that stay are in the same order in both lists.
+        local same = got == table.concat(in_target, " ") or case[6]
+        return got == want and same, string.format("%s: stay %s (in target's order %s)", label, got,
+            table.concat(in_target, " "))
     end)
 
     -- just_opened: { label, id, last item, started_max, seconds as last item, first play, expected }

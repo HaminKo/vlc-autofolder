@@ -112,6 +112,39 @@ function M.playlist_items()
     return vlc.playlist.get("playlist").children or {}
 end
 
+-- The playlist's item ids, in order.
+function M.playlist_ids()
+    local ids = {}
+    for i, item in ipairs(M.playlist_items()) do
+        ids[i] = item.id
+    end
+    return ids
+end
+
+-- Checks the rule VLC 3.0's playlist window needs, since it doesn't show a
+-- script's moves: the items still in the playlist from `before` (ids in the
+-- order the window showed them, e.g. from M.playlist_ids) are in that order
+-- now; the others were added again (new ids). Returns the names of the items
+-- that kept their id, in playlist order: "name | name | ...".
+function M.kept_order(label, before)
+    local was = {}
+    for i, id in ipairs(before) do
+        was[id] = i
+    end
+    local names, last, ok = {}, 0, true
+    for _, item in ipairs(M.playlist_items()) do
+        local at = was[item.id]
+        if at then
+            names[#names + 1] = M.file_name(item.path)
+            ok = ok and at > last
+            last = at
+        end
+    end
+    local list = table.concat(names, " | ")
+    M.check(label .. ": the items that kept their id kept their order", ok, "kept, in playlist order: " .. list)
+    return list
+end
+
 -- The decoded file name at the end of a URI.
 function M.file_name(uri)
     return vlc.strings.decode_uri(uri):match("[^/]*$")

@@ -2,6 +2,19 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-11: Build and re-sort re-add only the items that must move; the folder goes where the playing item is
+- **Rule:**
+  - Build and re-sort share one function (`place` in autofolder.lua). It works out the target order first. Then it keeps the most items it can where they are, deletes the others and adds them again together with the folder's new files (one enqueue, in sort order), and then does the front moves.
+  - Items that keep their id also keep their order relative to each other; only those may stay (`autofolder_core.keep_in_order`: the longest increasing run between the fixed items).
+  - Never re-added: the playing item (it would restart) and items that aren't the folder's (the user's own; they can be streams or discs, whose title and options would be lost). A folder file the user added themselves is re-added when it must move, and stays theirs (not removed on a folder switch).
+  - The folder goes where the playing item is, if it's one of the folder's; otherwise where the folder's first item is. In a build that is the opened file, which is always the playlist's last item, so the folder ends up after all the user's own items.
+- **Reason:** VLC 3.0's playlist window inserts an added item at its index in the playlist when it handles the event, removes items by id, and never reacts to a script's move (research/vlc-lua-api.md, "Playlist", `move`). So the window is right when the items that keep their id keep their order, and the new items are added in their final order. Re-adding only what must move keeps the reading of file details small (14 items for Episode 2 of 16 re-opened, 1 for Episode 15). With the folder at the opened file's place, the user's own items never have to cross the playing item, so they are never re-added.
+- **Changes:** the entries "The folder takes the place of its first item" (now: the playing item's place; the same unless the user's items sit between the folder and the re-opened file) and "A re-sort deletes and re-adds the folder's items" (now only the items that must move, and a user's own folder item too).
+- **Who:** the user, accepting Claude's suggestions (To do 6 questions).
+- **Rejected:**
+  - Re-adding the whole folder on every build: VLC re-reads every file's details (~12 files/s on a share), for no gain in the window.
+  - Keeping the folder at its first item's place: when a user's item sits between the folder and the re-opened file, that item would have to be re-added (title and options lost for a stream) or moved (the window then shows the re-added items in wrong rows too).
+
 ## 2026-11-11: The settings dialog: "Auto Folder Playlist settings", Save closes, the file is rewritten
 - **Rule:**
   - The View-menu entry is "Auto Folder Playlist settings"; the dialog's title is "Auto Folder Playlist".
@@ -32,6 +45,7 @@ One entry per decision, newest first. Each entry has the date and the decision a
   - Keeping the moves and telling the user to refresh the window (typing in its search box and clearing it should do it, per the source; untested): the window shows a wrong order until then.
   - Applying a new order only at the next file opened: re-opening a file of the same folder also moves items, so the window problem stays.
 - **Open:** the To do 2 build moves the re-opened copy of a file into the old copy's place, and the window shows it at the bottom (measured, step A test 8). Fix: To do 6.
+- **Changed by To do 6 (2026-11-11):** only the items that must move are re-added, a user's own folder item too (see the entry "Build and re-sort re-add only the items that must move").
 
 ## 2026-11-11: Sort-order switch: a settings file read while VLC runs, plus a View-menu dialog
 - **Rule:**
@@ -87,6 +101,7 @@ Refines the two 2026-11-11 entries below ("A folder is built only for a file tha
 - **Reason:** the user's items stay where they put them, and the folder goes where the opened file landed (at the end, since a double-click appends), as when VLC opens a folder itself (it expands the folder in place). With the folder first, VLC would play on into unrelated items after the last episode, and the user's list would be reordered.
 - **Who:** the user, accepting Claude's suggestion (To do 2 step B questions).
 - **Rejected:** the folder at the front of the playlist with the user's items after it (the step B plan written in step A): see Reason. It also needs a move for every folder item as soon as any user item is in the playlist.
+- **Changed by To do 6 (2026-11-11):** the folder now takes the place of the playing item (in a build, the opened file: the end of the playlist), not of its first item. It differs only when the user's items sit between the folder and the re-opened file (see the entry "Build and re-sort re-add only the items that must move").
 
 ## 2026-11-11: A folder is built only for a file that was just opened
 - **Rule:** the playing item triggers a build only when it was added after the previous file started playing, plays straight away, and is the newest item in the playlist. Playing an item that was already there (a click, Next/Previous, an .m3u's entries, several files opened at once) never builds.

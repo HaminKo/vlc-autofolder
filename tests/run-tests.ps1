@@ -74,13 +74,14 @@ $cases = @(
         Config = 'scenario=[[live]]'; Settings = "sort=name-za`n"
         LogMustMatch = @(
             '\[autofolder\] settings: sort name-za; video types mp4 mkv .+ \(from .+\\portable\\autofolder\.ini\)$'
-            # 16 videos: all but the playing one and the one the driver deleted are added again.
-            '\[autofolder\] folder .+\\media\\: re-sorted by date-newest; re-added 14 items; \d+ moves$'
-            '\[autofolder\] folder .+\\media\\: re-sorted by name-az; re-added 14 items; \d+ moves$'
+            # 15 videos (one deleted by the driver), Episode 2.mkv playing: the 14 others minus the
+            # longest run already in the new order on each side of it (worked out by hand: 6, 5, 6).
+            '\[autofolder\] folder .+\\media\\: re-sorted by date-newest; re-added 8 items; \d+ moves$'
+            '\[autofolder\] folder .+\\media\\: re-sorted by name-az; re-added 9 items; \d+ moves$'
             '\[autofolder\] autofolder\.ini line 1: unknown sort order "sideways" \(one of: .+\); using date-oldest$'
-            '\[autofolder\] folder .+\\media\\: re-sorted by date-oldest; re-added 14 items; \d+ moves$'
-            # A user's item plays: the whole folder is added again.
-            '\[autofolder\] folder .+\\media\\: re-sorted by name-az; re-added 15 items; \d+ moves$'
+            '\[autofolder\] folder .+\\media\\: re-sorted by date-oldest; re-added 8 items; \d+ moves$'
+            # A user's item plays: all 15 can be added again; the longest run in order (7) stays.
+            '\[autofolder\] folder .+\\media\\: re-sorted by name-az; re-added 8 items; \d+ moves$'
         )
     }
     @{
@@ -88,7 +89,7 @@ $cases = @(
         Config = 'scenario=[[types]]'; Settings = "# only these`r`nextensions=mp4, .AVI`r`n"
         LogMustMatch = @(
             '\[autofolder\] settings: sort date-oldest; video types mp4 avi \(from .+autofolder\.ini\)$'
-            '\[autofolder\] folder .+\\media\\: 4 videos, 1 before and 2 after it.s here\.mp4; added 3, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$'
+            '\[autofolder\] folder .+\\media\\: 4 videos, 1 before and 2 after it.s here\.mp4; added 3, re-added 0, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$'
             '\[autofolder\] not a video file: .+\\media\\Episode 1\.mkv$'
         )
         LogMustNotMatch = @('\[autofolder\] autofolder\.ini line')
@@ -103,20 +104,20 @@ $cases = @(
     # counts are the fewest moves to the front for each case.
     @{
         Name = 'build-first'; Driver = 'test_build'; Autofolder = $true; Files = @('Episode 10.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 0 before and 15 after Episode 10\.mkv; added 15, removed 0; 0 moves; \d+ ms \(scan \d+ ms\)$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 0 before and 15 after Episode 10\.mkv; added 15, re-added 0, removed 0; 0 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         # The Japanese name: Unicode in the opened file and in the files added around it.
         Name = 'build-middle'; Driver = 'test_build'; Autofolder = $true; Files = @($testVideos[12]); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 12 before and 3 after .+; added 15, removed 0; 12 moves; \d+ ms \(scan \d+ ms\)$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 12 before and 3 after .+; added 15, re-added 0, removed 0; 12 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         Name = 'build-last'; Driver = 'test_build'; Autofolder = $true; Files = @('attribute-hidden.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 15 before and 0 after attribute-hidden\.mkv; added 15, removed 0; 15 moves; \d+ ms \(scan \d+ ms\)$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 15 before and 0 after attribute-hidden\.mkv; added 15, re-added 0, removed 0; 15 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         Name = 'build-dot'; Driver = 'test_build'; Autofolder = $true; Files = @('.dot-hidden.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder .+: 17 videos, 15 before and 1 after \.dot-hidden\.mkv; added 16, removed 0; 15 moves; \d+ ms \(scan \d+ ms\)$')
+        LogMustMatch = @('\[autofolder\] folder .+: 17 videos, 15 before and 1 after \.dot-hidden\.mkv; added 16, re-added 0, removed 0; 15 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         # A running VLC: the user's own item (a video in another folder) is in the playlist, then a
@@ -124,38 +125,49 @@ $cases = @(
         # the user's item afterwards builds nothing.
         Name = 'build-user'; Driver = 'test_build'; Autofolder = $true; Files = @(); TimeoutSec = 30
         Config = 'user=[[{0}]],open=[[Episode 1.mkv]]' -f (Join-Path $testRoot 'summer.mkv')
-        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, removed 0; 3 moves; \d+ ms \(scan \d+ ms\)$')
+        LogMustMatch = @('\[autofolder\] folder .+: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, re-added 0, removed 0; 3 moves; \d+ ms \(scan \d+ ms\)$')
         LogMustNotMatch = @('\[autofolder\] left folder')
     }
     @{
         # Through a UNC path (\\127.0.0.1\C$\...): the folder is read and built through the share.
         Name = 'build-unc'; Driver = 'test_build'; Autofolder = $true; Unc = $true; Files = @(Join-Path $uncMedia 'Episode 2.mkv'); TimeoutSec = 30
-        LogMustMatch = @('\[autofolder\] folder \\\\127\.0\.0\.1\\.+\\media\\: 16 videos, 1 before and 14 after Episode 2\.mkv; added 15, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$')
+        LogMustMatch = @('\[autofolder\] folder \\\\127\.0\.0\.1\\.+\\media\\: 16 videos, 1 before and 14 after Episode 2\.mkv; added 15, re-added 0, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$')
     }
     @{
         # 500 videos. The one opened is the last by date, so all 499 others are moved before it.
         Name = 'build-big'; Driver = 'test_big'; Autofolder = $true; Big = $true; Files = @(Join-Path $bigFolder $bigVideos[-1]); TimeoutSec = 40
         Config = 'list=[[{0}]]' -f $bigList
-        LogMustMatch = @('\[autofolder\] folder .+\\big\\: 500 videos, 499 before and 0 after {0}; added 499, removed 0; 499 moves; \d+ ms \(scan \d+ ms\)$' -f [regex]::Escape($bigVideos[-1]))
+        LogMustMatch = @('\[autofolder\] folder .+\\big\\: 500 videos, 499 before and 0 after {0}; added 499, re-added 0, removed 0; 499 moves; \d+ ms \(scan \d+ ms\)$' -f [regex]::Escape($bigVideos[-1]))
     }
     # The playlist rules (test_rules.lua describes each scenario).
     @{
         Name = 'rules-switch'; Driver = 'test_rules'; Autofolder = $true; Files = @(); TimeoutSec = 40
         Config = 'scenario=[[switch]]'
         LogMustMatch = @(
-            '\[autofolder\] folder .+\\media\\: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, removed 1; 3 moves; \d+ ms \(scan \d+ ms\)$'
+            '\[autofolder\] folder .+\\media\\: 16 videos, 2 before and 13 after Episode 1\.mkv; added 15, re-added 0, removed 1; 3 moves; \d+ ms \(scan \d+ ms\)$'
             '\[autofolder\] left folder .+\\media\\: removed 15 items$'
-            '\[autofolder\] folder .+\\Season 2\\: 2 videos, 0 before and 1 after Episode 1\.mkv; added 1, removed 0; 0 moves; \d+ ms \(scan \d+ ms\)$'
+            '\[autofolder\] folder .+\\Season 2\\: 2 videos, 0 before and 1 after Episode 1\.mkv; added 1, re-added 0, removed 0; 0 moves; \d+ ms \(scan \d+ ms\)$'
         )
     }
     @{
         Name = 'rules-refresh'; Driver = 'test_rules'; Autofolder = $true; Files = @(); TimeoutSec = 40
         Config = 'scenario=[[refresh]]'
         LogMustMatch = @(
-            '\[autofolder\] folder .+\\refresh\\: 3 videos, 1 before and 1 after b\.mkv; added 2, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$'
-            '\[autofolder\] folder .+\\refresh\\: 3 videos, 0 before and 2 after a\.mkv; added 1, removed 2; 1 moves; \d+ ms \(scan \d+ ms\)$'
+            '\[autofolder\] folder .+\\refresh\\: 3 videos, 1 before and 1 after b\.mkv; added 2, re-added 0, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$'
+            # a.mkv again: the old copy and c.mkv removed, b.mkv added again after the playing copy.
+            '\[autofolder\] folder .+\\refresh\\: 3 videos, 0 before and 2 after a\.mkv; added 1, re-added 1, removed 2; 0 moves; \d+ ms \(scan \d+ ms\)$'
         )
         LogMustNotMatch = @('\[autofolder\] left folder')
+    }
+    @{
+        # The user's report in To do 6: Episode 2.mkv opened again. The 14 videos after it by date
+        # are added again behind the new copy, so nothing needs a move.
+        Name = 'rules-reopen'; Driver = 'test_rules'; Autofolder = $true; Files = @('Episode 2.mkv'); TimeoutSec = 30
+        Config = 'scenario=[[reopen]]'
+        LogMustMatch = @(
+            '\[autofolder\] folder .+\\media\\: 16 videos, 1 before and 14 after Episode 2\.mkv; added 15, re-added 0, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$'
+            '\[autofolder\] folder .+\\media\\: 16 videos, 1 before and 14 after Episode 2\.mkv; added 0, re-added 14, removed 1; 0 moves; \d+ ms \(scan \d+ ms\)$'
+        )
     }
     @{
         # Several files at once: the first plays, but it isn't the last item.

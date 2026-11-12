@@ -292,13 +292,16 @@ function M.match_items(items, folder, files, opened, exists)
     return delete
 end
 
--- The order the playlist should have once the folder is placed: the items
--- before the folder's first item (the user's own), then the folder's items in
--- sort order, then all other items in their current order. So the folder takes
--- the place of its first item, as when VLC opens a folder itself.
+-- The order the playlist should have once the folder is placed: the other
+-- items (the user's own) that are before the folder's place, then the folder's
+-- items in sort order, then the other items after its place, each in their
+-- current order. The folder takes the place of the item `anchor` (the playing
+-- one; in a build the opened file, which is the playlist's last item), or of
+-- its first item when anchor is nil or not one of the folder's.
 -- current: the playlist's item ids, in order. folder: the folder's ids in sort
--- order; ids that are not in current are left out. Returns a list of ids.
-function M.target_order(current, folder)
+-- order; ids that are not in current are left out. Returns the target (a list
+-- of ids), and the other items before and after the folder (two lists).
+function M.target_order(current, folder, anchor)
     local present, in_folder = {}, {}
     for _, id in ipairs(current) do
         present[id] = true
@@ -306,17 +309,28 @@ function M.target_order(current, folder)
     for _, id in ipairs(folder) do
         in_folder[id] = true
     end
-    local before, after, seen = {}, {}, false
-    for _, id in ipairs(current) do
-        if in_folder[id] then
-            seen = true
-        elseif seen then
-            after[#after + 1] = id
-        else
-            before[#before + 1] = id
+    if not (anchor and in_folder[anchor] and present[anchor]) then
+        anchor = nil
+        for _, id in ipairs(current) do
+            if in_folder[id] then
+                anchor = id
+                break
+            end
         end
     end
-    local target = before
+    local before, after, seen = {}, {}, false
+    for _, id in ipairs(current) do
+        if id == anchor then
+            seen = true
+        elseif not in_folder[id] then
+            local side = seen and after or before
+            side[#side + 1] = id
+        end
+    end
+    local target = {}
+    for _, id in ipairs(before) do
+        target[#target + 1] = id
+    end
     for _, id in ipairs(folder) do
         if present[id] then
             target[#target + 1] = id
@@ -325,7 +339,75 @@ function M.target_order(current, folder)
     for _, id in ipairs(after) do
         target[#target + 1] = id
     end
-    return target
+    return target, before, after
+end
+
+-- Marks in `keep` the ids of the longest run of `ids` whose ranks (rank[id])
+-- increase. Patience sorting: tails[k] is the index of the run of length k
+-- that ends with the lowest rank so far; prev links each index to the one
+-- before it in its run.
+local function mark_longest_increasing(ids, rank, keep)
+    local tails, prev = {}, {}
+    for i, id in ipairs(ids) do
+        local lo, hi = 1, #tails + 1
+        while lo < hi do
+            local mid = math.floor((lo + hi) / 2)
+            if rank[ids[tails[mid]]] < rank[id] then
+                lo = mid + 1
+            else
+                hi = mid
+            end
+        end
+        prev[i] = tails[lo - 1]
+        tails[lo] = i
+    end
+    local i = tails[#tails]
+    while i do
+        keep[ids[i]] = true
+        i = prev[i]
+    end
+end
+
+-- Which items can stay where they are when the playlist goes from the order
+-- `current` to `target` (lists of the same ids) and all other items are
+-- deleted and added again. VLC 3.0's playlist window doesn't show a move
+-- (research/vlc-lua-api.md), so the items that stay must keep their order
+-- relative to each other.
+-- fixed: id -> true for the items that can't be added again. They always
+-- stay; target_order keeps them in order when the playing item is its anchor
+-- (if not, the window shows the ones out of order in their old place).
+-- Returns id -> true for the most items that can stay: the fixed ones and,
+-- between each two of them, the longest run of the others that is in
+-- target's order and fits between them.
+function M.keep_in_order(current, target, fixed)
+    local rank = {}
+    for i, id in ipairs(target) do
+        rank[id] = i
+    end
+    local keep, run, low = {}, {}, 0
+    -- The others since the last fixed item: those ranked between it and the
+    -- next fixed item (rank high) can stay.
+    local function close_run(high)
+        local fits = {}
+        for _, id in ipairs(run) do
+            if rank[id] > low and rank[id] < high then
+                fits[#fits + 1] = id
+            end
+        end
+        mark_longest_increasing(fits, rank, keep)
+        run = {}
+    end
+    for _, id in ipairs(current) do
+        if fixed[id] then
+            close_run(rank[id])
+            keep[id] = true
+            low = math.max(low, rank[id])
+        else
+            run[#run + 1] = id
+        end
+    end
+    close_run(#target + 1)
+    return keep
 end
 
 -- The fewest moves "to the front of the playlist" that turn the order current

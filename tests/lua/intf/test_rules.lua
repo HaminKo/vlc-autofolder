@@ -8,10 +8,18 @@ run-tests.ps1 starts it next to autofolder; config.scenario picks the case:
             Then a file of media\Season 2 opened: the media items go, the
             user's items stay, Season 2 is built. Clicking the user's item
             changes nothing.
-- refresh:  refresh\b.mkv opened (a build: a, b, c). Then c.mkv is deleted,
-            d.mkv created, and a.mkv opened again (VLC appends a copy): one
-            copy of a, the playing one, then b, d. Then the playlist is cleared
-            and b.mkv opened again: the folder is built again.
+- refresh:  refresh\b.mkv opened (a build: a, b, c), then the user's item
+            summer.mkv enqueued after it. Then c.mkv is deleted, d.mkv
+            created, and a.mkv opened again (VLC appends a copy): summer.mkv,
+            then one copy of a, the playing one, then b, d (the folder goes
+            where the opened copy is). Then the playlist is cleared and b.mkv
+            opened again: the folder is built again.
+- reopen:   Episode 2.mkv opened (a build), then opened again: the folder
+            with the new copy in the old one's place (the user's report in
+            To do 6).
+In the builds after the first, the items that keep their id must keep their
+order, since VLC's playlist window doesn't show a script's moves
+(testlib.kept_order).
 - no-build: VLC opened the files on its command line (several files, or an
             .m3u); the playlist must stay config.expect, also after Next.
 - late:     a media file opened (a build), then an item enqueued and clicked
@@ -117,6 +125,7 @@ local scenarios = {}
 function scenarios.switch()
     vlc.playlist.enqueue({ { path = uri(root .. "\\summer.mkv") }, { path = uri(media .. "\\Episode 1.mkv") } })
     local own = find("media\\Episode 1.mkv")
+    local shown = t.playlist_ids()
     open(media .. "\\Episode 1.mkv")
     local first = wait_playing("media\\Episode 1.mkv", own and own.id)
     if not expect("the user's item, then the media folder with one copy of Episode 1.mkv",
@@ -124,6 +133,9 @@ function scenarios.switch()
         return
     end
     still_plays("Episode 1.mkv", first)
+    shown[#shown + 1] = first.id
+    t.equal("Episode 1.mkv opened: the items that kept their id",
+        t.kept_order("Episode 1.mkv opened", shown), "summer.mkv | Episode 1.mkv")
 
     open(media .. "\\Season 2\\Episode 1.mkv")
     local second = wait_playing("media\\Season 2\\Episode 1.mkv")
@@ -144,17 +156,30 @@ function scenarios.refresh()
         return
     end
 
+    -- The user adds an item of their own after the folder.
+    vlc.playlist.enqueue({ { path = uri(root .. "\\summer.mkv") } })
+    if not expect("the user's item after the folder",
+            "refresh\\a.mkv | refresh\\b.mkv | refresh\\c.mkv | summer.mkv") then
+        return
+    end
+
     -- The folder changes while VLC runs: c.mkv deleted, d.mkv new (dated now: last).
     vlc.io.unlink(dir .. "\\c.mkv")
     t.check("c.mkv deleted", not vlc.net.stat(dir .. "\\c.mkv"))
     copy_file(dir .. "\\a.mkv", dir .. "\\d.mkv")
     local old_a = find("refresh\\a.mkv")
+    local shown = t.playlist_ids()
     open(dir .. "\\a.mkv") -- VLC appends a second copy of a.mkv and plays it
     local a = wait_playing("refresh\\a.mkv", old_a and old_a.id)
-    expect("a.mkv opened again: one copy of a, b, the new d; c is gone",
-        "refresh\\a.mkv | refresh\\b.mkv | refresh\\d.mkv")
+    -- The folder goes where the opened copy is, after the user's item, which
+    -- isn't added again; b.mkv, before summer.mkv until now, is.
+    expect("a.mkv opened again: the user's item, then one copy of a, b, the new d; c is gone",
+        "summer.mkv | refresh\\a.mkv | refresh\\b.mkv | refresh\\d.mkv")
     if a then
         still_plays("the second copy of a.mkv", a)
+        shown[#shown + 1] = a.id
+        t.equal("a.mkv opened again: the items that kept their id",
+            t.kept_order("a.mkv opened again", shown), "summer.mkv | a.mkv")
     end
 
     -- The step A gap: after the playlist was cleared, the same folder is built again.
@@ -165,6 +190,27 @@ function scenarios.refresh()
     expect("cleared, then b.mkv opened: the folder again", "refresh\\a.mkv | refresh\\b.mkv | refresh\\d.mkv")
     if b then
         still_plays("b.mkv", b)
+    end
+end
+
+-- The user's report (To do 6): the media folder built from Episode 2.mkv,
+-- then Episode 2.mkv opened again. Its new copy plays in the old copy's place
+-- (2nd by date). It was shown last, so the items after it by date are added
+-- again; the one before it keeps its id.
+function scenarios.reopen()
+    local first = wait_playing("media\\Episode 2.mkv")
+    if not expect("Episode 2.mkv opened: the media folder", media_folder()) then
+        return
+    end
+    local shown = t.playlist_ids()
+    open(media .. "\\Episode 2.mkv")
+    local again = wait_playing("media\\Episode 2.mkv", first and first.id)
+    expect("Episode 2.mkv opened again: the folder with one copy of it, in its place", media_folder())
+    if again then
+        still_plays("the second copy of Episode 2.mkv", again)
+        shown[#shown + 1] = again.id
+        t.equal("Episode 2.mkv opened again: the items that kept their id",
+            t.kept_order("Episode 2.mkv opened again", shown), "Episode 10.mkv | Episode 2.mkv")
     end
 end
 

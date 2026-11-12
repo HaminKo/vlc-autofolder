@@ -7,8 +7,10 @@ VLC starts it with the extra-interface setting:
 When a video file is opened (a double-click, Open File, a drop onto the
 window), it adds the other videos of that folder to the playlist, in the sort
 order of the settings (date modified, oldest first, by default), and puts the
-folder in that order where the opened file is. The user's own items keep their
-places.
+folder in that order where the opened file is: at the end. The user's own
+items keep their order before it.
+- VLC's playlist window doesn't show a script's moves, so the folder items
+  that must change their order are deleted and added again (place).
 - The settings file (autofolder_settings: the sort order and the video types)
   is read at start and about every second. A new sort order re-sorts the
   folder at once; new video types apply to the next file opened.
@@ -41,6 +43,7 @@ local active_folder = nil -- path key of the folder built last
 local active_path = nil   -- its path, for the log
 local active_files = nil  -- its files ({ name, mtime, id, ... }) at the build, for a re-sort
 local managed = {}        -- id -> true for the items of that folder this script added, and the file opened there
+local readded = {}        -- id -> true for the user's own items this script added again (never "just opened")
 local last_id = -1        -- the playing item's id at the previous poll
 local started_max = 0     -- the highest id in the playlist when the playing item started
 local played_any = false  -- whether an item has started since this script started
@@ -126,17 +129,35 @@ local function playlist_ids()
     return ids
 end
 
+-- The ids of the files ({ id, ... }) that have one, in the files' order.
+local function ids_of(files)
+    local ids = {}
+    for _, file in ipairs(files) do
+        if file.id then
+            ids[#ids + 1] = file.id
+        end
+    end
+    return ids
+end
+
 -- Puts the playlist in the order `target` (ids, as core.target_order gives
--- them) with the fewest moves. Moves only to the front of the playlist node:
--- VLC 3.0's move after an item is broken (docs/decisions.md). Returns the
--- number of moves.
+-- them; ids no longer in the playlist are left out) with the fewest moves.
+-- Moves only to the front of the playlist node: VLC 3.0's move after an item
+-- is broken (docs/decisions.md). Returns the number of moves.
 local function reorder(target)
     local node = vlc.playlist.get("playlist")
-    local current = {}
+    local current, present = {}, {}
     for i, item in ipairs(node.children or {}) do
         current[i] = item.id
+        present[item.id] = true
     end
-    local moves = core.front_moves(current, target)
+    local wanted = {}
+    for _, id in ipairs(target) do
+        if present[id] then
+            wanted[#wanted + 1] = id
+        end
+    end
+    local moves = core.front_moves(current, wanted)
     for _, id in ipairs(moves) do
         if vlc.playlist.move(id, node.id) ~= 0 then
             warn("cannot move item " .. id .. " (removed meanwhile?)")
@@ -145,11 +166,75 @@ local function reorder(target)
     return #moves
 end
 
--- Puts the folder's items (ids in sort order) together, in that order, where
--- the folder's first item is now; the user's own items keep their order around
--- them (core.target_order). Returns the number of moves.
-local function arrange(folder_ids)
-    return reorder(core.target_order(playlist_ids(), folder_ids))
+-- Puts the folder's files ({ id, path, ... } in sort order) together, in
+-- that order, where the playing item is (if it's one of them; otherwise where
+-- the folder's first item is), with the user's own items in their order around
+-- them (core.target_order). Files with no id are added; a file whose item is
+-- gone (the user deleted it) stays out.
+-- VLC 3.0's playlist window doesn't show a move of an item it already shows,
+-- but it shows items deleted and added, each at its index in the playlist when
+-- it handles the event (research/vlc-lua-api.md). So the items that would
+-- change their order are deleted first and added again with the new files, in
+-- one enqueue in sort order, before the moves; the others keep their order
+-- (core.keep_in_order). Never added again: the playing item (it would
+-- restart) and the user's items outside the folder. An item added again stays
+-- this script's, or the user's. The target is worked out before anything is
+-- deleted, so the folder keeps its place also when none of its items stays.
+-- Returns the number of files added, of items added again, and of moves.
+local function place(files)
+    local current = playlist_ids()
+    local present = {}
+    for _, id in ipairs(current) do
+        present[id] = true
+    end
+    local folder_ids, in_folder = {}, {}
+    for _, file in ipairs(files) do
+        if file.id and present[file.id] then
+            folder_ids[#folder_ids + 1] = file.id
+            in_folder[file.id] = true
+        end
+    end
+    local playing = vlc.playlist.current()
+    local target, before, after = core.target_order(current, folder_ids, playing)
+    local fixed = {}
+    for _, id in ipairs(current) do
+        fixed[id] = id == playing or not in_folder[id]
+    end
+    local keep = core.keep_in_order(current, target, fixed)
+
+    local old_ids, again, users, new = {}, {}, {}, {}
+    for _, file in ipairs(files) do
+        if file.id and present[file.id] and not keep[file.id] then
+            old_ids[#old_ids + 1] = file.id
+            again[#again + 1] = file
+            users[file] = not managed[file.id]
+            file.id = nil
+        end
+        if not file.id then
+            new[#new + 1] = file
+        end
+    end
+    delete(old_ids)
+    local count = enqueue(new)
+    local count_again = 0
+    for _, file in ipairs(again) do
+        if file.id then
+            count_again = count_again + 1
+            if users[file] then
+                managed[file.id] = nil
+                readded[file.id] = true
+            end
+        end
+    end
+
+    local wanted = before
+    for _, id in ipairs(ids_of(files)) do
+        wanted[#wanted + 1] = id
+    end
+    for _, id in ipairs(after) do
+        wanted[#wanted + 1] = id
+    end
+    return count - count_again, count_again, reorder(wanted)
 end
 
 -- Removes the items of the active folder that this script added, and the file
@@ -166,17 +251,6 @@ end
 
 local function file_exists(path)
     return vlc.net.stat(path) ~= nil
-end
-
--- The ids of the files ({ id, ... }) that have one, in the files' order.
-local function ids_of(files)
-    local ids = {}
-    for _, file in ipairs(files) do
-        if file.id then
-            ids[#ids + 1] = file.id
-        end
-    end
-    return ids
 end
 
 -- Builds the folder of the file just opened (the item `id`, path `path`): adds
@@ -249,13 +323,9 @@ local function build(path, id)
         managed[file_id] = nil
     end
 
-    local missing = {}
-    for _, file in ipairs(files) do
-        if not file.id then
-            missing[#missing + 1] = file
-        end
-    end
-    local added = enqueue(missing)
+    active_files = files
+    -- The opened item plays, so the folder goes where it is: at the end.
+    local added, again, moves = place(files)
 
     local folder_ids, before = ids_of(files), 0
     for i, file_id in ipairs(folder_ids) do
@@ -264,64 +334,32 @@ local function build(path, id)
         end
     end
     local after = #folder_ids - 1 - before
-    active_files = files
-    local moves = arrange(folder_ids)
     -- The time shows whether a slow share is the cause when the folder comes late.
-    info(string.format("folder %s: %d videos, %d before and %d after %s; added %d, removed %d; %d moves;"
-        .. " %.0f ms (scan %.0f ms)", folder, #files, before, after, name, added, removed, moves,
-        (vlc.misc.mdate() - start) / 1000, (scanned - start) / 1000))
+    info(string.format("folder %s: %d videos, %d before and %d after %s; added %d, re-added %d, removed %d;"
+        .. " %d moves; %.0f ms (scan %.0f ms)", folder, #files, before, after, name, added, again, removed,
+        moves, (vlc.misc.mdate() - start) / 1000, (scanned - start) / 1000))
 end
 
 -- Puts the active folder's items in the sort order `order`, after the order
--- changed. It only reorders, by the names and dates of the build: adding and
--- removing files, and a file changed since, wait for the next file opened.
--- VLC 3.0's playlist window doesn't show a move of an item it already shows
--- (research/vlc-lua-api.md), but it does show items deleted and added. So the
--- items this script added are deleted and added again in the new order, then
--- placed. Kept: the playing item (it would restart) and the user's own items
--- (moved, so the window may show them in their old place). The order is
--- worked out before the items are deleted, so the folder keeps its place also
--- when none of its items stays. Items removed meanwhile stay removed.
+-- changed (place: only the items that must move are added again). It only
+-- reorders, by the names and dates of the build: adding and removing files,
+-- and a file changed since, wait for the next file opened. Items removed
+-- meanwhile stay removed.
 local function resort(order)
     if not active_files then
         return
     end
     core.sort_files(active_files, order)
-    local current = playlist_ids()
-    local present = {}
-    for _, id in ipairs(current) do
-        present[id] = true
-    end
-    local target = core.target_order(current, ids_of(active_files))
-
-    local playing = vlc.playlist.current()
-    local again, old_ids = {}, {}
+    -- Only files that have an item: one whose enqueue found no item (warned)
+    -- would otherwise be added again on every change.
+    local with_item = {}
     for _, file in ipairs(active_files) do
-        if file.id and present[file.id] and managed[file.id] and file.id ~= playing then
-            again[#again + 1] = file
-            old_ids[#old_ids + 1] = file.id
+        if file.id then
+            with_item[#with_item + 1] = file
         end
     end
-    delete(old_ids)
-    for _, file in ipairs(again) do
-        file.id = nil
-    end
-    local added = enqueue(again)
-
-    -- The target with the new ids; an item that wasn't added again is left out.
-    local new_id = {}
-    for i, file in ipairs(again) do
-        new_id[old_ids[i]] = file.id or false
-    end
-    local wanted = {}
-    for _, id in ipairs(target) do
-        local new = new_id[id]
-        if new ~= false then
-            wanted[#wanted + 1] = new or id
-        end
-    end
-    local moves = reorder(wanted)
-    info(string.format("folder %s: re-sorted by %s; re-added %d items; %d moves", active_path, order, added, moves))
+    local _, again, moves = place(with_item)
+    info(string.format("folder %s: re-sorted by %s; re-added %d items; %d moves", active_path, order, again, moves))
 end
 
 -- Applies the settings file's text (nil: no file): the video types for the
@@ -415,8 +453,10 @@ local function poll()
     played_any = true
     local previous_max = started_max
     started_max = max_id(items)
-    if managed[id] then
-        return -- an item this script added: clicked, or reached with Next/Previous
+    if managed[id] or readded[id] then
+        -- An item this script added (or added again: it can be the last item,
+        -- added seconds ago): clicked, or reached with Next/Previous.
+        return
     end
     local opened, reason = core.just_opened(id, tail_id, previous_max,
         (vlc.misc.mdate() - tail_since) / 1000000, first_play)

@@ -6,7 +6,7 @@ When you open a single video file in VLC 3.0 on Windows (for example by double-c
 
 ## Status
 In development. Built for VLC 3.0.24 on Windows 11. What works so far:
-- Opening a video (double-click, Open File, or dropping it on the window) adds the other videos of its folder, before and after it, in the sort order you chose (date modified, oldest first, unless you change it). Items you added to the playlist yourself keep their places.
+- Opening a video (double-click, Open File, or dropping it on the window) adds the other videos of its folder, before and after it, in the sort order you chose (date modified, oldest first, unless you change it). The folder goes at the end of the playlist, after items you added yourself, which keep their order.
 - The sort order and the video file types are set in a dialog (View menu) or a small settings file (see below); a new sort order re-sorts the playlist within about two seconds, without restarting VLC.
 - Opening a video from another folder replaces the previous folder's videos with the new folder's; your own items stay.
 - Opening a video of the same folder again leaves one copy of each file, adds new files, and removes items whose file was deleted.
@@ -41,7 +41,7 @@ extensions=mp4 mkv avi
 - On a network share, VLC reads each added file's details (such as its length) in the background. That's slower than on a local disk (about 12 files per second through a test share on the same PC, against 500 files in 4 s locally). Playback isn't affected, but the lengths appear in the playlist gradually.
 - VLC 3.0 itself can't play files opened as `\\localhost\...`. Use the computer's name or a drive letter instead.
 - When you remove a type from `extensions`, files of that type already in the playlist stay there until you open a video from another folder.
-- VLC 3.0's playlist window doesn't show items a script moves. So a new sort order removes the folder's videos from the playlist and adds them again in the new order. VLC then reads their lengths again, which is quick on a local disk and gradual on a network share. A folder video you added to the playlist yourself is moved instead, so the window may still show it in its old place. VLC plays it in the right order either way.
+- VLC 3.0's playlist window doesn't show items a script moves. So when folder videos have to change places (a new sort order, or a video of the folder opened again), the script removes those videos from the playlist and adds them again in their new place; the others stay. VLC then reads their lengths again, which is quick on a local disk and gradual on a network share. The playing video and items from other folders are never removed this way.
 
 ## Install (planned)
 1. Close VLC.
