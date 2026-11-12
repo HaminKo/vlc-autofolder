@@ -1,6 +1,6 @@
 --[[
 Helpers for autofolder.lua that don't change the playlist: paths and URIs,
-the video filter, natural name order, the folder scan, and the decisions
+the video filter, the sort orders, the folder scan, and the decisions
 (when to build, which items to remove, the order to reach). Load with:
     local core = require "autofolder_core"
 Tests: tests\lua\intf\test_core.lua.
@@ -10,18 +10,22 @@ String comparisons here go byte by byte: Lua's "<" on strings uses the C
 locale's collation, which could differ between PCs.
 --]]
 
+local settings = require "autofolder_settings"
+
 local M = {}
 
--- File extensions that count as video, lower case (To do 3 makes them configurable).
-M.VIDEO_EXTENSIONS = {
-    "mp4", "mkv", "avi", "mov", "wmv", "webm", "m4v", "flv", "ts", "mpg", "mpeg",
-    "m2ts", "mts", "3gp", "ogv", "vob",
-}
+local video_set -- extension (lower case) -> true: the file types that count as video
 
-local video_set = {}
-for _, ext in ipairs(M.VIDEO_EXTENSIONS) do
-    video_set[ext] = true
+-- Sets the file extensions that count as video (a list of lower-case
+-- extensions without the dot, as autofolder_settings gives them).
+function M.set_extensions(list)
+    video_set = {}
+    for _, ext in ipairs(list) do
+        video_set[ext] = true
+    end
 end
+
+M.set_extensions(settings.DEFAULT_EXTENSIONS)
 
 -- An item "plays straight away" when it starts at most this many seconds after
 -- it became the playlist's last item (docs/decisions.md).
@@ -91,7 +95,7 @@ function M.path_key(path)
     return ascii_lower((path:gsub("/", "\\")))
 end
 
--- True for a file name with a video extension (any case).
+-- True for a file name with a video extension (any case; set_extensions).
 function M.is_video(name)
     local ext = name:match("%.([^.\\/]+)$")
     return ext ~= nil and video_set[ascii_lower(ext)] == true
@@ -165,18 +169,42 @@ function M.natural_less(a, b)
     return compare_names({ name = a, lower = ascii_lower(a) }, { name = b, lower = ascii_lower(b) }) < 0
 end
 
--- Sorts a list of files ({ name, mtime, ... }) in place: date modified, oldest
--- first, then natural name order. Returns the list.
-function M.sort_by_date(files)
-    for _, file in ipairs(files) do
-        file.lower = file.lower or ascii_lower(file.name)
-    end
-    table.sort(files, function(a, b)
+-- "Comes before" for each sort order (the ids in autofolder_settings.ORDERS),
+-- on two files ({ name, lower, mtime }). Equal dates go by name A to Z in both
+-- date orders (docs/decisions.md).
+local comes_before = {
+    ["date-oldest"] = function(a, b)
         if a.mtime ~= b.mtime then
             return a.mtime < b.mtime
         end
         return compare_names(a, b) < 0
-    end)
+    end,
+    ["date-newest"] = function(a, b)
+        if a.mtime ~= b.mtime then
+            return a.mtime > b.mtime
+        end
+        return compare_names(a, b) < 0
+    end,
+    ["name-az"] = function(a, b)
+        return compare_names(a, b) < 0
+    end,
+    ["name-za"] = function(a, b)
+        return compare_names(a, b) > 0
+    end,
+}
+
+-- Sorts a list of files ({ name, mtime, ... }) in place, in the sort order
+-- `order` (an id from autofolder_settings.ORDERS; names in natural order).
+-- Returns the list. Raises an error for an unknown order.
+function M.sort_files(files, order)
+    local less = comes_before[order]
+    if not less then
+        error("unknown sort order: " .. tostring(order), 2)
+    end
+    for _, file in ipairs(files) do
+        file.lower = file.lower or ascii_lower(file.name)
+    end
+    table.sort(files, less)
     return files
 end
 

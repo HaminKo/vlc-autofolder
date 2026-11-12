@@ -5,6 +5,7 @@ its vlc.* functions). run-tests.ps1 starts it alone, with no file to play.
 
 local t = require "testlib"
 local core = require "autofolder_core"
+local settings = require "autofolder_settings" -- from lua\modules\: also checks VLC's module path
 
 -- Checks fn(x) for each x in list; one result line, naming the items that failed.
 local function each(label, list, fn)
@@ -73,6 +74,13 @@ t.run(function()
         function(name)
             return not core.is_video(name)
         end)
+    core.set_extensions({ "mp4", "srt" })
+    each("set_extensions: only the types set", { "a.MP4", "b.srt", "!c.mkv", "!d.avi" }, function(name)
+        local want = name:sub(1, 1) ~= "!"
+        return core.is_video((name:gsub("^!", ""))) == want
+    end)
+    core.set_extensions(settings.DEFAULT_EXTENSIONS)
+    t.check("set_extensions back to the defaults", core.is_video("a.mkv") and not core.is_video("b.srt"))
 
     -- Natural order: each name comes before every name after it, and not after.
     local order = {
@@ -101,12 +109,21 @@ t.run(function()
         end)
     t.check("natural_less is false for the same name", not core.natural_less("Episode 1.mkv", "Episode 1.mkv"))
 
-    -- sort_by_date: oldest first, equal dates in natural order.
-    local files = {
-        { name = "Episode 10.mkv", mtime = 5 }, { name = "b.mkv", mtime = 9 },
-        { name = "Episode 2.mkv", mtime = 5 }, { name = "a.mkv", mtime = 1 },
+    -- sort_files: each order; equal dates by name A to Z in both date orders.
+    local sorted = {
+        ["date-oldest"] = "a.mkv | Episode 2.mkv | Episode 10.mkv | b.mkv",
+        ["date-newest"] = "b.mkv | Episode 2.mkv | Episode 10.mkv | a.mkv",
+        ["name-az"] = "a.mkv | b.mkv | Episode 2.mkv | Episode 10.mkv",
+        ["name-za"] = "Episode 10.mkv | Episode 2.mkv | b.mkv | a.mkv",
     }
-    t.equal("sort_by_date", names_of(core.sort_by_date(files)), "a.mkv | Episode 2.mkv | Episode 10.mkv | b.mkv")
+    for _, sort in ipairs(settings.ORDERS) do
+        local files = {
+            { name = "Episode 10.mkv", mtime = 5 }, { name = "b.mkv", mtime = 9 },
+            { name = "Episode 2.mkv", mtime = 5 }, { name = "a.mkv", mtime = 1 },
+        }
+        t.equal("sort_files " .. sort.id, names_of(core.sort_files(files, sort.id)), sorted[sort.id])
+    end
+    t.check("sort_files raises an error for an unknown order", not pcall(core.sort_files, {}, "size"))
 
     -- scan_folder on the test media: videos only (no .srt .jpg .txt .nfo .m3u, no
     -- subfolder, no dot-name; the attribute-hidden file is kept), in date order.
@@ -116,7 +133,7 @@ t.run(function()
             expected[#expected + 1] = name
         end
     end
-    local scanned = core.sort_by_date(core.scan_folder(media .. "\\"))
+    local scanned = core.sort_files(core.scan_folder(media .. "\\"), "date-oldest")
     t.equal("scan_folder: the videos, in date order", names_of(scanned), table.concat(expected, " | "))
     t.equal("scan_folder: full paths", scanned[1] and scanned[1].path, media .. "\\" .. expected[1])
     local ok = pcall(core.scan_folder, media .. "\\no such folder\\")

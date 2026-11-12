@@ -70,19 +70,13 @@ local function wait_playing(name, not_id)
     return item
 end
 
--- Waits until the playlist is `want` (autofolder polls every 300 ms), then 1 s
--- more so that extra changes would show, and checks it.
+-- Waits until the playlist is `want`, then checks it (t.expect).
 local function expect(label, want)
-    t.wait_for(function() return names() == want end, 5)
-    t.sleep(1)
-    return t.equal(label, names(), want)
+    return t.expect(label, want, names)
 end
 
--- Checks that the item plays and was started once (not restarted).
 local function still_plays(label, item)
-    t.equal(label .. ": still plays", vlc.playlist.current(), item.id)
-    local now = vlc.playlist.get(item.id)
-    t.equal(label .. ": started once", now and now.nb_played, 1)
+    t.still_plays(label, item.id)
 end
 
 -- Plays the item by id (a click in the playlist) and checks that it plays.

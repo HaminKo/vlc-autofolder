@@ -126,6 +126,23 @@ function M.playlist_names()
     return table.concat(names, " | ")
 end
 
+-- Waits until names() is `want` (autofolder polls every 300 ms), then 1 s
+-- more so that extra changes would show, and checks it. names gives the
+-- playlist as text (M.playlist_names if nil). Returns true when it matched.
+function M.expect(label, want, names)
+    names = names or M.playlist_names
+    M.wait_for(function() return names() == want end, 5)
+    M.sleep(1)
+    return M.equal(label, names(), want)
+end
+
+-- Checks that the item `id` plays and was started once (not restarted).
+function M.still_plays(label, id)
+    M.equal(label .. ": still plays", vlc.playlist.current(), id)
+    local now = vlc.playlist.get(id)
+    M.equal(label .. ": started once", now and now.nb_played, 1)
+end
+
 -- Runs the test body, records an uncaught error as a failure, writes "done"
 -- and quits VLC. It never returns: VLC's closing interrupts its last wait,
 -- and that "Interrupted." error ends the script (run-tests.ps1 allows it).

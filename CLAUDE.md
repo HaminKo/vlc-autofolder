@@ -19,7 +19,7 @@ Don't build what's under "Later" in docs/todo.md until asked.
 - Fast, after edits:
   - luacheck: `tools\luacheck.exe lua tests` (~0.1 s, measured)
   - PowerShell lint: `Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error` (~2 s, measured)
-- Once per step: `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1` (`-Case NAME` for one case; for several use `-Command "& .\tests\run-tests.ps1 -Case a,b"`, since `-File` passes `a,b` as one name). It runs the portable VLC in `tools\vlc` with no window, one VLC per case, and fails if `%APPDATA%\vlc` changed (~66 s for 16 cases, measured; rules-late waits 11 s; build-big makes a 500-file folder first; the first run of a day can be slower).
+- Once per step: `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1` (`-Case NAME` for one case; for several use `-Command "& .\tests\run-tests.ps1 -Case a,b"`, since `-File` passes `a,b` as one name). It runs the portable VLC in `tools\vlc` with no window, one VLC per case, and fails if `%APPDATA%\vlc` changed (~82 s for 19 cases, measured; rules-late waits 11 s; build-big makes a 500-file folder first; the first run of a day can be slower).
 - A test case = an entry in `$cases` in run-tests.ps1 + a driver `tests\lua\intf\test_*.lua` using `require "testlib"`. The runner also fails on any `lua error:` log line except the "Interrupted." that ends a script on exit. Shared paths, test media and VLC options: `tests\TestCommon.ps1`.
 - By hand only, with every VLC closed: `tests\spike-one-instance.ps1` (one-instance hand-over; ~35 s, estimated).
 - No screenshot GUI test (see Decisions). The Qt parts are in the manual checklist (docs/manual-test.md, from To do 5).
@@ -55,6 +55,8 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - After a build, the folder sits where its first item was (normally the opened file); the user's own items keep their places around it.
 - Only a file just opened builds: the playlist's last item (by position, not id), started within 10 s of becoming last (the first play after VLC starts always counts). One copy per folder file.
 - A build runs whole, in one poll, at once (measured fast for 500 files); a folder that can't be read is logged, not retried.
+- Settings (sort order, video types) live in `autofolder.ini` in `vlc.config.userdatadir()`, shared code in `lua\modules\`; read about every second, a change applied when two reads agree; the interface script never creates the file.
+- VLC 3.0's playlist window doesn't show a script's moves: a re-sort deletes and re-adds the script's items (not the playing one).
 
 ## Project docs
 - README.md

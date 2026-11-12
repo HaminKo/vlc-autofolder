@@ -40,12 +40,18 @@ $ErrorActionPreference = 'Stop'
 #   Config:       more fields for the driver's config table, in Lua syntax (e.g. "open=[[a.mkv]]").
 #   Big:          needs the 500-video folder ($bigFolder), made only when such a case runs.
 #   Unc:          needs $uncMedia (the admin share C$); skipped, not failed, when it can't be reached.
+#   Settings:     the text of the settings file (autofolder.ini in the test VLC's user folder,
+#                 tools\vlc\portable) at the start; without it, there is no settings file.
 # The driver's config table (lua-config) holds: out (its results file), media (the media
 # folder), videos (the video list file, oldest first) and unc (the media folder as a UNC path).
 $cases = @(
     @{
         Name = 'smoke'; Driver = 'test_smoke'; Autofolder = $true; Files = @('Episode 2.mkv'); TimeoutSec = 20
-        LogMustMatch = @('\[autofolder\] started', 'autofolder\.lua:\d+: Interrupted\.$')
+        LogMustMatch = @(
+            '\[autofolder\] started'
+            '\[autofolder\] settings: sort date-oldest; video types mp4 mkv .+ \(defaults: no file .+\\portable\\autofolder\.ini\)$'
+            'autofolder\.lua:\d+: Interrupted\.$'
+        )
     }
     @{
         # Every video plus one UNC path, so the playlist holds the URIs VLC makes itself.
@@ -57,6 +63,35 @@ $cases = @(
     @{
         # The helper module autofolder_core; no file to play.
         Name = 'core'; Driver = 'test_core'; Files = @(); TimeoutSec = 20
+    }
+    # The settings file (test_settings.lua describes each scenario).
+    @{
+        Name = 'settings-parse'; Driver = 'test_settings'; Files = @(); TimeoutSec = 20
+        Config = 'scenario=[[parse]]'
+    }
+    @{
+        Name = 'settings-live'; Driver = 'test_settings'; Autofolder = $true; Files = @('Episode 2.mkv'); TimeoutSec = 40
+        Config = 'scenario=[[live]]'; Settings = "sort=name-za`n"
+        LogMustMatch = @(
+            '\[autofolder\] settings: sort name-za; video types mp4 mkv .+ \(from .+\\portable\\autofolder\.ini\)$'
+            # 16 videos: all but the playing one and the one the driver deleted are added again.
+            '\[autofolder\] folder .+\\media\\: re-sorted by date-newest; re-added 14 items; \d+ moves$'
+            '\[autofolder\] folder .+\\media\\: re-sorted by name-az; re-added 14 items; \d+ moves$'
+            '\[autofolder\] autofolder\.ini line 1: unknown sort order "sideways" \(one of: .+\); using date-oldest$'
+            '\[autofolder\] folder .+\\media\\: re-sorted by date-oldest; re-added 14 items; \d+ moves$'
+            # A user's item plays: the whole folder is added again.
+            '\[autofolder\] folder .+\\media\\: re-sorted by name-az; re-added 15 items; \d+ moves$'
+        )
+    }
+    @{
+        Name = 'settings-types'; Driver = 'test_settings'; Autofolder = $true; Files = @("it's here.mp4"); TimeoutSec = 30
+        Config = 'scenario=[[types]]'; Settings = "# only these`r`nextensions=mp4, .AVI`r`n"
+        LogMustMatch = @(
+            '\[autofolder\] settings: sort date-oldest; video types mp4 avi \(from .+autofolder\.ini\)$'
+            '\[autofolder\] folder .+\\media\\: 4 videos, 1 before and 2 after it.s here\.mp4; added 3, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$'
+            '\[autofolder\] not a video file: .+\\media\\Episode 1\.mkv$'
+        )
+        LogMustNotMatch = @('\[autofolder\] autofolder\.ini line')
     }
     # Building the folder from the first, a middle and the last video by date (16 videos, the
     # dot-name not counted), and from the dot-named one, which the scan itself skips. The move
@@ -156,6 +191,10 @@ function Invoke-TestCase {
         if (-not [IO.Path]::IsPathRooted($file)) { $file = Join-Path $media $file }
         $vlcArgs += '"' + $file + '"'
     }
+
+    $settingsFile = Join-Path $portable 'autofolder.ini'
+    if (Test-Path -LiteralPath $settingsFile) { Remove-Item -LiteralPath $settingsFile -Force }
+    if ($Spec.Settings) { [IO.File]::WriteAllText($settingsFile, $Spec.Settings, (New-Object Text.UTF8Encoding($false))) }
 
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $process = Start-Process -FilePath $vlcExe -ArgumentList $vlcArgs -PassThru -WindowStyle Hidden

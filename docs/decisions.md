@@ -2,6 +2,35 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-11: A re-sort deletes and re-adds the folder's items instead of moving them
+- **Rule:** when the sort order changes, the active folder's items that the script added are deleted and enqueued again in the new order, then placed with front moves as in a build.
+  - The playing item stays, since re-adding it would restart it.
+  - The user's own items stay and are moved.
+  - Items the user deleted meanwhile stay out.
+- **Reason:** in the step A manual test the playlist was re-sorted (log, and playback went on in the new order), but VLC 3.0's playlist window kept the old order. The window shows items added and removed, but not an item moved by a script (research/vlc-lua-api.md, "Playlist", `move`).
+- **Cost:**
+  - VLC reads each re-added file's details again. That took ~4 s for 500 local files and ~12 files/s on a share (measured in To do 2 step D). Playback isn't affected.
+  - A user's own folder item can show in its old place in the window.
+  - The window places an added item when it handles the event, which could come before the script's move. Not seen: the window was right after 5 sort changes by hand (step A tests 3–6).
+- **Who:** the user, accepting Claude's suggestion (after To do 3 step A manual test 3).
+- **Rejected:**
+  - Keeping the moves and telling the user to refresh the window (typing in its search box and clearing it should do it, per the source; untested): the window shows a wrong order until then.
+  - Applying a new order only at the next file opened: re-opening a file of the same folder also moves items, so the window problem stays.
+- **Open:** the To do 2 build moves the re-opened copy of a file into the old copy's place, and the window shows it at the bottom (measured, step A test 8). Fix: To do 6.
+
+## 2026-11-11: Sort-order switch: a settings file read while VLC runs, plus a View-menu dialog
+- **Rule:**
+  - The settings are in `autofolder.ini` in VLC's user folder (`vlc.config.userdatadir()`, `%APPDATA%\vlc`): `sort=` one of `date-oldest` (default), `date-newest`, `name-az`, `name-za`, and `extensions=` the video types. A wrong value is logged as a warning and that line's default is used. The interface script never creates the file.
+  - The interface script reads the file at start and about every second, comparing its contents. A changed text is applied when the next read gives it again (so a file read while being saved is never used); the first read is applied at once. A sort change re-sorts the active folder's items at once (reorder only, by re-adding them: see "A re-sort deletes and re-adds" above; the playing file keeps playing). A change of the video types applies at the next file opened.
+  - Newest first breaks equal dates by name A→Z; name orders are natural order.
+  - A companion extension (View → Auto Folder Playlist, To do 3 step B) writes the same file. The settings code is shared in `lua\modules\autofolder_settings.lua`.
+- **Reason:** a switch inside VLC without a restart, and a file that also works without the dialog (Skins interface, or editing by hand). The contents are compared rather than the file time, because `stat` times count whole seconds, so two saves within one second could be missed. The second read was added after the step A code review: the dialog and Notepad both empty the file before writing it, and a read in between would re-sort twice and warn about a cut-off value.
+- **Who:** the user, accepting Claude's suggestions (To do 3 questions).
+- **Rejected:**
+  - The "Lua interface configuration" preference (`lua-config`): Lua syntax in a preference field shared with VLC's other Lua interfaces, a restart for each change, and a typo silently breaks it.
+  - Applying a change of the video types to the current playlist: removing items of a dropped type needs more rules for a rare change.
+  - Newest first as the exact reverse of oldest first (equal dates Z→A): files copied together would play last episode first.
+
 ## 2026-11-11: A build runs whole and at once; a folder that can't be read is not retried
 - **Rule:**
   - The build runs in one poll, as soon as the opened file is seen, also for hundreds of files and on network shares.

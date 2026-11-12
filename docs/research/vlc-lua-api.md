@@ -30,6 +30,8 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
   - **Measured 2026-11-10:** `vlc.net` and `vlc.io` are tables in an interface script. ~~Unverified until To do 1 step B: that `stat` and `opendir` work there.~~ **Measured 2026-11-11: they work** (tests\lua\intf\test_api.lua; details under "Files and folders"). The README says the net namespace is usable "for interfaces and extensions".
 - No change callbacks: `vlc.var.add_callback` is not in the 3.0 README (only `var.trigger_callback`). The script must **poll**, e.g. `vlc.playlist.current()` every 300–500 ms. **Measured 2026-11-11:** `vlc.var.add_callback` is nil.
 - Modules: VLC's own `cli` interface loads `require "host"` from `lua\intf\modules\`. So a helper module in `lua\intf\modules\` should load with `require`. **Measured 2026-11-10: works**, from the user folder too. `package.path` lists, in order: the user `lua\modules\` and `lua\intf\modules\`, then the same two in VLC's own `lua\` folder (`?.luac`, `?.lua`, `?.vle` each).
+  - **Measured 2026-11-11 (To do 3 step A):** a module in the user `lua\modules\` (`autofolder_settings`) loads with `require` from an interface script, and from a module in `lua\intf\modules\` that the script loaded.
+  - For an extension script (`lua\extensions\`), the 3.0 source (`vlclua_add_modules_path` in modules/lua/vlc.c) adds the script folder's parent `lua\modules\` and `lua\extensions\modules\` the same way, so a shared module goes in `lua\modules\`. **Source only:** to be measured in To do 3 step B.
 
 ## Files and folders (source: libs/net.c, README)
 - **`vlc.net.stat(path)`** takes a local path, not a URI. It returns nil on failure; otherwise a table with:
@@ -58,9 +60,12 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
   - `file:read("*a")` works on a `vlc.io` file (the test library reads `videos.txt` this way).
 - **`vlc.config.userdatadir()`** returns the user's VLC data folder (on Windows `%APPDATA%\vlc`). It's a good place for a settings file.
   - **Measured 2026-11-10:** in portable mode it returns the `portable` folder next to vlc.exe; `vlc.config.datadir()` returns VLC's program folder.
+  - **Measured 2026-11-11:** the path has no trailing backslash (`...\tools\vlc\portable`). The settings file `autofolder.ini` goes there (decisions.md, "Sort-order switch").
 - **Measured 2026-11-10:** `vlc.io.open(path, "w")` with `:write`, `:flush` and `:close` works in an interface script (the test library writes its results this way).
   - When it can't open the file (a folder that doesn't exist), it returns **no value at all**, not `nil` plus a message like Lua's `io.open`. So `assert(vlc.io.open(...))` only says "bad argument #1 to 'assert' (value expected)"; check the result and raise your own message.
   - **Measured 2026-11-11 (To do 2 step C, test_rules.lua):** modes `"rb"` and `"wb"` with `read("*a")` copy a 185 KB video (the copy was scanned and enqueued as a video; its bytes weren't compared). **`vlc.io.unlink(path)`** exists and deletes a file.
+  - **Measured 2026-11-11 (To do 3 step A, test_settings.lua):** `vlc.io.open(folder, "rb")` on a folder that exists also returns no value. So "no value" alone doesn't tell a missing file from one that can't be read; `autofolder_settings.read` asks `vlc.net.stat` then.
+  - A settings file rewritten while VLC runs was picked up within the 5 s the test allows each time (read every ~1 s, compared by text). How long one read takes wasn't measured; it is a ~200-byte file.
 
 ## Strings and URIs (source: README)
 - `vlc.strings.make_uri(path, [scheme])` converts a path to a URI.
@@ -99,6 +104,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
   - **Measured 2026-11-11 (To do 2 step C, rules-switch and rules-refresh):** deleting items that don't play, right after another item started (15 at a folder switch; an earlier copy and an item whose file is gone at a refresh), keeps the playing item playing: same id, started once.
   - Ids come from a counter that only grows (3.0 source `i_last_playlist_id`, from memory, not checked; it fits every id measured so far), so an old id never names a new item; deleting it again returns -1.
 - **`clear()`** empties the playlist node and stops playback; `current()` is then -1 (measured 2026-11-11, rules-refresh). A file opened after that gets a new id as usual.
+- **`stop()`** keeps `current()` at the stopped item's id: still the same 5 s later (measured 2026-11-11, To do 3 step A, a draft of settings-live). So -1 doesn't mean "stopped".
 - **`move(id_item, id_where)`**
   - If `id_where` is a node, the item becomes its **first** child.
   - ~~Otherwise the item is placed **after** `id_where`, in the same parent.~~ **Wrong, measured 2026-11-11.** The 3.0.x source (`vlclua_playlist_move`) computes the new index from **item ids**: `id_where - first_child_id + 1`, not from `id_where`'s position. That is only right when ids happen to follow the playlist order.
@@ -112,7 +118,22 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
     - The playing item keeps playing: same id, and the time doesn't go back.
     - Next and Previous follow the new order.
     - Moving the playing item itself to the front also keeps it playing, and Next then follows the new order.
-    - **Also during a build (measured 2026-11-11, To do 2 step B, test_build.lua):** 0 to 15 moves in the same poll as the enqueue, right as the opened file starts. In all 5 cases the opened file kept its id, was started once (`nb_played` 1), and Previous played the file before it. Not measured: whether the Qt playlist view shows the new order at once (manual test), and ~~the time for hundreds of moves (step D)~~ (measured: 499 moves take 1–2 ms, see "Large folders" below).
+    - **Also during a build (measured 2026-11-11, To do 2 step B, test_build.lua):** 0 to 15 moves in the same poll as the enqueue, right as the opened file starts. In all 5 cases the opened file kept its id, was started once (`nb_played` 1), and Previous played the file before it. ~~Not measured: whether the Qt playlist view shows the new order at once (manual test)~~ (see the next point), and ~~the time for hundreds of moves (step D)~~ (measured: 499 moves take 1–2 ms, see "Large folders" below).
+    - **The Qt playlist window doesn't show a move of an item it already shows (measured 2026-11-11, To do 3 step A manual test).**
+      - In the windowed test VLC, after `sort=name-az` was saved, the log said `re-sorted by name-az; 12 moves`. Playback then went on in name order: it's here.mp4, percent…, plus…, 日本語.mkv, 🎬 clip.mp4, then "nothing to play". The window kept the date order, also after Next.
+      - The headless tests check the playlist itself, so they can't see this.
+      - Source (3.0.x, `modules/gui/qt/components/playlist/playlist_model.cpp`): the window's model only reacts to:
+        - an item added (`processItemAppend`)
+        - an item removed (`processItemRemoval`)
+        - its own drag and drop (`dropMove`)
+
+        Nothing handles an item moved by the core.
+    - From the same source, **not measured**:
+      - VLC hands the "item added" event to the window's thread with `QApplication::postEvent` (input_manager.cpp), and the window places the item at its index in the playlist **when it handles the event**. So an item that is added and then moved shows in the right place only if the window handles the event after the move.
+      - In the To do 2 build, 4 items were added and then moved before the opened file. The window showed them in the right place (one manual test).
+      - The window re-reads the whole playlist (`rebuild`) when its search text changes (`filter`) and when its root item is removed.
+    - **So a re-sort deletes and re-adds the items** (decisions.md, 2026-11-11). The settings-live case checks that the re-sorted items have new ids. **Measured by hand (2026-11-11, To do 3 step A tests 3–6):** 15 items re-added and placed, 5 sort changes in a row. The window showed the new order every time, with no item in a wrong row, so the race above didn't show.
+    - **Also in a build (measured 2026-11-11, step A test 8):** Ctrl+O on Episode 2.mkv again, with its folder built (16 videos, date order). The new copy played, and the build moved it into the old copy's place (2nd). The window showed it **at the bottom**. That is To do 6.
 - `auto-preparse=1` (default) makes VLC read metadata of every added item. With hundreds of files, especially on a network share, that is background work to watch in To do 2.
   - **Measured 2026-11-11 (To do 2 step A):** after `enqueue`, the log shows `Creating an input for preparsing '<name>'` for each added item, one after another, interleaved with the opening of the playing file.
   - On the first test run of the day, the smoke case's Episode 2.mkv (14 files added) took more than 5 s to show its first picture; three warm runs right after took 1.2 s per case. Whether the preparsing slows a cold start is **not measured** (one cold run only; cold opens of 7.9 s were measured before any files were added). To check in step D, with a large folder.

@@ -5,9 +5,13 @@ VLC starts it with the extra-interface setting:
     extraintf=luaintf{intf=autofolder}
 
 When a video file is opened (a double-click, Open File, a drop onto the
-window), it adds the other videos of that folder to the playlist, sorted by
-date modified (oldest first; equal dates by name), and puts the folder in that
-order where the opened file is. The user's own items keep their places.
+window), it adds the other videos of that folder to the playlist, in the sort
+order of the settings (date modified, oldest first, by default), and puts the
+folder in that order where the opened file is. The user's own items keep their
+places.
+- The settings file (autofolder_settings: the sort order and the video types)
+  is read at start and about every second. A new sort order re-sorts the
+  folder at once; new video types apply to the next file opened.
 - Only a file that was just opened builds (core.just_opened): playing an item
   that was already in the playlist never changes it.
 - A file from another folder: the previous folder's items this script added,
@@ -20,12 +24,22 @@ Messages start with "[autofolder]": Tools > Messages, verbosity 2.
 --]]
 
 local core = require "autofolder_core"
+local settings = require "autofolder_settings"
 
-local POLL_US = 300000 -- 300 ms, in microseconds
+local POLL_US = 300000      -- 300 ms, in microseconds
+local SETTINGS_US = 1000000 -- how often the settings file is read: 1 s
 local PREFIX = "[autofolder] "
+
+local NONE = {} -- "no text": unlike nil, which means "no file"
+local sort_order = settings.ORDERS[1].id -- from the settings file
+local settings_text = NONE  -- the settings file's text applied last (nil: no file)
+local settings_new = NONE   -- a changed text read once, applied when the next read gives it again
+local settings_at = nil     -- when the file was read last (vlc.misc.mdate); nil: never
+local settings_unreadable = false -- whether the last read failed (warned once)
 
 local active_folder = nil -- path key of the folder built last
 local active_path = nil   -- its path, for the log
+local active_files = nil  -- its files ({ name, mtime, id, ... }) at the build, for a re-sort
 local managed = {}        -- id -> true for the items of that folder this script added, and the file opened there
 local last_id = -1        -- the playing item's id at the previous poll
 local started_max = 0     -- the highest id in the playlist when the playing item started
@@ -103,24 +117,39 @@ local function delete(ids)
     return count
 end
 
--- Puts the folder's items (ids in sort order) together, in that order, where
--- the folder's first item is now; the user's own items keep their order around
--- them (core.target_order). Moves only to the front of the playlist node:
+-- The playlist's item ids, in order.
+local function playlist_ids()
+    local ids = {}
+    for i, item in ipairs(playlist_items()) do
+        ids[i] = item.id
+    end
+    return ids
+end
+
+-- Puts the playlist in the order `target` (ids, as core.target_order gives
+-- them) with the fewest moves. Moves only to the front of the playlist node:
 -- VLC 3.0's move after an item is broken (docs/decisions.md). Returns the
 -- number of moves.
-local function arrange(folder_ids)
+local function reorder(target)
     local node = vlc.playlist.get("playlist")
     local current = {}
     for i, item in ipairs(node.children or {}) do
         current[i] = item.id
     end
-    local moves = core.front_moves(current, core.target_order(current, folder_ids))
+    local moves = core.front_moves(current, target)
     for _, id in ipairs(moves) do
         if vlc.playlist.move(id, node.id) ~= 0 then
             warn("cannot move item " .. id .. " (removed meanwhile?)")
         end
     end
     return #moves
+end
+
+-- Puts the folder's items (ids in sort order) together, in that order, where
+-- the folder's first item is now; the user's own items keep their order around
+-- them (core.target_order). Returns the number of moves.
+local function arrange(folder_ids)
+    return reorder(core.target_order(playlist_ids(), folder_ids))
 end
 
 -- Removes the items of the active folder that this script added, and the file
@@ -137,6 +166,17 @@ end
 
 local function file_exists(path)
     return vlc.net.stat(path) ~= nil
+end
+
+-- The ids of the files ({ id, ... }) that have one, in the files' order.
+local function ids_of(files)
+    local ids = {}
+    for _, file in ipairs(files) do
+        if file.id then
+            ids[#ids + 1] = file.id
+        end
+    end
+    return ids
 end
 
 -- Builds the folder of the file just opened (the item `id`, path `path`): adds
@@ -173,7 +213,7 @@ local function build(path, id)
         playing = { name = name, path = path, mtime = stat.modification_time }
         files[#files + 1] = playing
     end
-    core.sort_by_date(files)
+    core.sort_files(files, sort_order)
 
     local remove = core.match_items(playlist_items(), folder, files, id, file_exists)
     if playing.id ~= id then
@@ -217,21 +257,121 @@ local function build(path, id)
     end
     local added = enqueue(missing)
 
-    local folder_ids, before = {}, 0
-    for _, file in ipairs(files) do
-        if file.id then
-            folder_ids[#folder_ids + 1] = file.id
-            if file == playing then
-                before = #folder_ids - 1
-            end
+    local folder_ids, before = ids_of(files), 0
+    for i, file_id in ipairs(folder_ids) do
+        if file_id == playing.id then
+            before = i - 1
         end
     end
     local after = #folder_ids - 1 - before
+    active_files = files
     local moves = arrange(folder_ids)
     -- The time shows whether a slow share is the cause when the folder comes late.
     info(string.format("folder %s: %d videos, %d before and %d after %s; added %d, removed %d; %d moves;"
         .. " %.0f ms (scan %.0f ms)", folder, #files, before, after, name, added, removed, moves,
         (vlc.misc.mdate() - start) / 1000, (scanned - start) / 1000))
+end
+
+-- Puts the active folder's items in the sort order `order`, after the order
+-- changed. It only reorders, by the names and dates of the build: adding and
+-- removing files, and a file changed since, wait for the next file opened.
+-- VLC 3.0's playlist window doesn't show a move of an item it already shows
+-- (research/vlc-lua-api.md), but it does show items deleted and added. So the
+-- items this script added are deleted and added again in the new order, then
+-- placed. Kept: the playing item (it would restart) and the user's own items
+-- (moved, so the window may show them in their old place). The order is
+-- worked out before the items are deleted, so the folder keeps its place also
+-- when none of its items stays. Items removed meanwhile stay removed.
+local function resort(order)
+    if not active_files then
+        return
+    end
+    core.sort_files(active_files, order)
+    local current = playlist_ids()
+    local present = {}
+    for _, id in ipairs(current) do
+        present[id] = true
+    end
+    local target = core.target_order(current, ids_of(active_files))
+
+    local playing = vlc.playlist.current()
+    local again, old_ids = {}, {}
+    for _, file in ipairs(active_files) do
+        if file.id and present[file.id] and managed[file.id] and file.id ~= playing then
+            again[#again + 1] = file
+            old_ids[#old_ids + 1] = file.id
+        end
+    end
+    delete(old_ids)
+    for _, file in ipairs(again) do
+        file.id = nil
+    end
+    local added = enqueue(again)
+
+    -- The target with the new ids; an item that wasn't added again is left out.
+    local new_id = {}
+    for i, file in ipairs(again) do
+        new_id[old_ids[i]] = file.id or false
+    end
+    local wanted = {}
+    for _, id in ipairs(target) do
+        local new = new_id[id]
+        if new ~= false then
+            wanted[#wanted + 1] = new or id
+        end
+    end
+    local moves = reorder(wanted)
+    info(string.format("folder %s: re-sorted by %s; re-added %d items; %d moves", active_path, order, added, moves))
+end
+
+-- Applies the settings file's text (nil: no file): the video types for the
+-- next build, a new sort order at once. Remembers the text only when all of
+-- it worked, so an error is retried at the next read.
+local function apply_settings(text, path)
+    local values, warnings = settings.parse(text or "")
+    for _, message in ipairs(warnings) do
+        warn(settings.FILE_NAME .. " " .. message)
+    end
+    core.set_extensions(values.extensions)
+    info(string.format("settings: sort %s; video types %s (%s %s)", values.sort,
+        table.concat(values.extensions, " "), text and "from" or "defaults: no file", path))
+    if values.sort ~= sort_order then
+        resort(values.sort)
+        sort_order = values.sort
+    end
+    settings_text = text
+end
+
+-- Reads the settings file, at most once per SETTINGS_US, and applies a
+-- change. The text is compared, not the file's time: stat's times count whole
+-- seconds. A changed text is applied when the next read gives it again, so a
+-- file read while it is being written is never applied. The first read is
+-- applied at once, so the first build uses it.
+local function check_settings()
+    local now = vlc.misc.mdate()
+    if settings_at and now - settings_at < SETTINGS_US then
+        return
+    end
+    local first = settings_at == nil
+    settings_at = now
+    local path = settings.path()
+    local text = settings.read(path)
+    if text == false then
+        if not settings_unreadable then
+            settings_unreadable = true
+            warn("cannot read " .. path .. "; keeping the settings read before (at start: the defaults)")
+        end
+        return -- try again at the next read
+    end
+    settings_unreadable = false
+    if text == settings_text then
+        settings_new = NONE
+    elseif first or text == settings_new then
+        settings_new = NONE
+        apply_settings(text, path)
+    else
+        settings_new = text
+    end
 end
 
 -- Called when the file `id` was just opened.
@@ -266,7 +406,9 @@ local function poll()
     end
     last_id = id -- set first, so a failing item isn't retried on every poll
     if id == -1 then
-        return -- stopped: the next item is judged against the one before
+        -- No current item (e.g. after clear(); stop() keeps it): the next
+        -- item is judged against the one before.
+        return
     end
 
     local first_play = not played_any
@@ -286,16 +428,22 @@ local function poll()
     on_opened(id)
 end
 
+local STEPS = { check_settings, poll } -- run in this order on every poll
+
 info("started")
 
 -- Never wrap mwait in pcall: when VLC closes, mwait raises "Interrupted.",
 -- and that error must end this script, or VLC can hang on close.
 while true do
-    -- A bug in one poll is logged and doesn't stop the script. poll never
-    -- waits, so this pcall can't catch the "Interrupted." of VLC closing.
-    local ok, err = pcall(poll)
-    if not ok then
-        vlc.msg.err(PREFIX .. tostring(err))
+    -- A bug in one poll is logged and doesn't stop the script. Neither
+    -- function waits, so these pcalls can't catch the "Interrupted." of VLC
+    -- closing. The settings come first, so the first build uses them; a bug
+    -- there doesn't stop the builds.
+    for _, step in ipairs(STEPS) do
+        local ok, err = pcall(step)
+        if not ok then
+            vlc.msg.err(PREFIX .. tostring(err))
+        end
     end
     vlc.misc.mwait(vlc.misc.mdate() + POLL_US)
 end
