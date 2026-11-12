@@ -62,7 +62,8 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - README.md
 - docs/spec.md: the original brief
 - docs/local.md: this PC's paths and commands; gitignored
-- docs/todo.md; docs/todo/: big to-dos in their own files, with a Progress list
+- docs/todo.md: the list; docs/todo/: one file per to-do, with a Progress list once it is built in steps
+- docs/archive/: finished to-dos' files, read only when a to-do names one
 - docs/decisions.md
 - docs/research/: one file per topic (vlc-lua-api.md so far)
 

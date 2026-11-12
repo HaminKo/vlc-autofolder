@@ -18,7 +18,7 @@ places.
   and the file opened there, are removed first.
 - The same folder again: it is refreshed. One copy per file, files that are
   new in the folder are added, items whose file is gone are removed.
-The rules and the plan: docs/todo/02-interface-script.md, docs/decisions.md.
+The rules and the plan: docs/archive/02-interface-script.md, docs/decisions.md.
 
 Messages start with "[autofolder]": Tools > Messages, verbosity 2.
 --]]
