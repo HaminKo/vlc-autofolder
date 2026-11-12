@@ -16,6 +16,7 @@
     - opening an .m3u
     - a network share
     - a large folder
+    - install, install again (update) and uninstall on the real VLC (README "Install"): vlcrc differs from the first `.bak` only in the extraintf line, and after uninstall it is byte-identical to it (tested by hand in To do 4)
 - **Ask the user:** none yet.
 - **Test:**
   - Claude: every README step is checked against the code.

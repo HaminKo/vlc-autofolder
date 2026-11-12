@@ -2,6 +2,31 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-12: Double-click install.cmd and uninstall.cmd start the PowerShell scripts
+- **Rule:** `install.cmd` runs `install.ps1` with Windows PowerShell's full path and `-ExecutionPolicy Bypass`, passes its arguments and exit code on, and `pause`s so the window shows the result; `uninstall.cmd` is `install.cmd -Uninstall`. When install.ps1 isn't next to it (double-clicked inside Explorer's zip view, which extracts only that file), it says to extract the zip first. All logic stays in the `.ps1` files. `.gitattributes` keeps `.cmd` files CRLF in checkouts and GitHub zips.
+- **Reason:** typing a long PowerShell command in the right folder was the hard part of installing; a double-click is the usual way for small Windows tools.
+- **Who:** the user asked for an easier install; Claude suggested the `.cmd` files and the user agreed (To do 4).
+- **Rejected:**
+  - An installer .exe (Inno Setup, NSIS): unsigned, SmartScreen warns even more, and a build tool for 4 files and one line.
+  - A web one-liner (`irm .../install.ps1 | iex`): needs the public repo, and asks people to run a script straight from the web. Possible later, next to the zip.
+  - Setting it up from inside VLC: a Lua script can't save vlcrc.
+  - Install waiting for VLC to close instead of stopping: with the window open, double-clicking again is as easy, and a prompt could hang an unattended run.
+- **Not checked:** whether Windows warns before running a `.cmd` from a downloaded zip (Mark of the Web); a "Before a public release" item.
+
+## 2026-11-12: install.ps1 adds one extraintf entry; uninstall removes only that entry, our files and autofolder.ini
+- **Rule:**
+  - install.ps1 copies `lua\` into VLC's user folder and adds `luaintf{intf=autofolder}` to `extraintf` in vlcrc (chain syntax), keeping other entries; `lua-intf` is never touched. Running it again updates the files and leaves vlcrc alone.
+  - The entry goes into the last `extraintf=` line (VLC uses the last one), else replaces `#extraintf=`, else is added at the end of the file.
+  - uninstall.ps1 (a wrapper for `install.ps1 -Uninstall`) removes our files, the folders they leave empty, `autofolder.ini`, and our entry; a line left empty becomes `#extraintf=` again, so a default vlcrc comes back byte for byte.
+  - Both stop while any VLC runs, and install stops when vlcrc doesn't exist yet (the user starts and closes VLC once). vlcrc is backed up (`vlcrc.autofolder-YYYYMMDD-HHMMSS.bak`) before every change and edited as Latin-1 text, so every other byte stays as it was.
+- **Reason:** other settings may have changed since the install, so restoring a backup could undo them. Chain syntax lets another Lua interface keep `lua-intf` (measured in To do 1). Latin-1 maps bytes to characters one to one, so the BOM, LF endings and UTF-8 or ANSI text survive without the script knowing the encoding.
+- **Who:** the user, accepting Claude's suggestions (To do 4 questions).
+- **Rejected:**
+  - Uninstall restoring the install backup: it would also undo the user's later settings.
+  - `extraintf=luaintf` with `lua-intf=autofolder`: it takes the one global `lua-intf` from any other Lua interface.
+  - Writing a minimal vlcrc when there is none: one more code path, only for someone who installs before ever starting VLC.
+  - Keeping `autofolder.ini` on uninstall: updating is running install again, so uninstall means "remove it all".
+
 ## 2026-11-11: Build and re-sort re-add only the items that must move; the folder goes where the playing item is
 - **Rule:**
   - Build and re-sort share one function (`place` in autofolder.lua). It works out the target order first. Then it keeps the most items it can where they are, deletes the others and adds them again together with the folder's new files (one enqueue, in sort order), and then does the front moves.

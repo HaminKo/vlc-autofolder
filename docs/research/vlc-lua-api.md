@@ -161,6 +161,16 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
 - **Opening an .m3u** (measured 2026-11-11, To do 2 step C, rules-m3u; `playlist.m3u` lists `Episode 1.mkv` and `Episode 2.mkv`, given on the command line): the .m3u item is replaced in place by its entries, a flat list with new ids in list order (3, 4), and the first entry plays. autofolder's 300 ms poll never saw the .m3u item itself playing.
   - With `playlist-tree` on (not the default), the entries would stay under a node. autofolder only looks at the playlist node's direct children, so such nested items aren't matched or de-duplicated (not tested).
 
+## How VLC reads vlcrc (measured 2026-11-12, To do 4, with the portable test VLC)
+From memory of 3.0's `config_LoadConfigFile` (src/config/file.c), then measured:
+- It skips a UTF-8 BOM (without one, values are read as ANSI), skips lines starting with `#` or `[` and empty lines, and reads every `name=value` line. **Sections are ignored:** `extraintf=luaintf{intf=autofolder}` appended at the very end of the file, after the last section, started autofolder (measured).
+- **The last line of a name wins:** our line in `[core]` followed by `extraintf=` at the end: autofolder didn't start; `extraintf=` in `[core]` followed by our line at the end: it started (measured).
+- **Names are case-sensitive:** a vlcrc with only `ExtraIntf=luaintf{intf=autofolder}` didn't start autofolder (measured).
+- Each line's last character is cut off as the newline, so a CRLF file would leave `\r` in every value (source only; vlcrc files VLC writes have LF only).
+- `vlc.exe --reset-config -I dummy vlc://quit` writes a complete default vlcrc (UTF-8 with BOM, LF only, 5302 lines for 3.0.24, header `vlc 3.0.24`, `#extraintf=` at line 4584 under `[core]`) and exits with code 0 in ~1.2 s. Command-line options aren't saved into it: the file has no uncommented setting (measured).
+- **`--control` adds interfaces after `extraintf`:** with `extraintf=luaintf{intf=autofolder}` in vlcrc and `--control "luaintf{intf=test_smoke}"` on the command line (no `--extraintf`), both scripts ran (measured). The test runner's install case relies on this.
+- Not checked (from memory of the Qt source): in Tools → Preferences → All → Interface → Main interfaces, ticking or unticking a module's box rebuilds the `extraintf` text from the ticked boxes, which would drop `{intf=autofolder}`. The README tells users to run install again if autofolder stops after changing that page.
+
 ## One-instance mode (measured 2026-11-11, tests\spike-one-instance.ps1)
 First from memory of `src/win32/specific.c` (both now confirmed):
 - When a second VLC is started with one-instance active, it sends its files to the running VLC, which **appends** them to the playlist and plays the first one, unless `playlist-enqueue=1`. It **doesn't clear** the old playlist.

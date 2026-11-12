@@ -7,7 +7,8 @@
     - Builds the test media in %TEMP%\vlc-autofolder-tests\media.
     - Runs each case in $cases: one headless VLC with a driver script (tests\lua\intf\test_*.lua),
       usually next to autofolder. The driver writes ok/fail lines to a results file
-      (format: tests\lua\intf\modules\testlib.lua).
+      (format: tests\lua\intf\modules\testlib.lua). The install cases check install.ps1 and
+      uninstall.ps1 (tests\InstallChecks.ps1).
     - Fails if anything in the real %APPDATA%\vlc changed.
     Needs the tools from tests\setup-tools.ps1. Exit code 0 when every case passes.
 
@@ -29,6 +30,8 @@ $ErrorActionPreference = 'Stop'
 
 # Paths ($root, $vlcExe, $media, $testRoot, $userVlc, ...) and the shared helpers.
 . (Join-Path $PSScriptRoot 'TestCommon.ps1')
+# Test-InstallScript and Initialize-InstalledPortable.
+. (Join-Path $PSScriptRoot 'InstallChecks.ps1')
 
 # Each case starts one VLC.
 #   Driver:       a script in tests\lua\intf (without .lua).
@@ -42,6 +45,12 @@ $ErrorActionPreference = 'Stop'
 #   Unc:          needs $uncMedia (the admin share C$); skipped, not failed, when it can't be reached.
 #   Settings:     the text of the settings file (autofolder.ini in the test VLC's user folder,
 #                 tools\vlc\portable) at the start; without it, there is no settings file.
+#   Install:      instead of Autofolder: the portable folder is set up by install.ps1 (vlcrc
+#                 starts autofolder), and the driver is loaded through --control, so no
+#                 --extraintf overrides vlcrc. The portable folder is rebuilt afterwards.
+#   Check:        a script block run instead of VLC; it returns result lines in the drivers'
+#                 format (ok / fail / done).
+#   NoOtherVlc:   runs install.ps1, which refuses while any VLC is open: skipped while yours is.
 # The driver's config table (lua-config) holds: out (its results file), media (the media
 # folder), videos (the video list file, oldest first) and unc (the media folder as a UNC path).
 $cases = @(
@@ -188,20 +197,35 @@ $cases = @(
         LogMustMatch = @('\[autofolder\] item \d+ started, no build: added 1\d\.\d s before it started$')
         LogMustNotMatch = @('\[autofolder\] left folder', '\[autofolder\] folder .+Season 2')
     }
+    @{
+        # install.ps1 and uninstall.ps1 against small vlcrc files, without VLC (tests\InstallChecks.ps1).
+        Name = 'install-script'; Check = { Test-InstallScript }; NoOtherVlc = $true
+    }
+    @{
+        # VLC loads autofolder through the vlcrc and the files install.ps1 put into the portable folder.
+        Name = 'install'; Driver = 'test_build'; Install = $true; NoOtherVlc = $true; Files = @('Episode 2.mkv'); TimeoutSec = 30
+        LogMustMatch = @(
+            '\[autofolder\] started'
+            '\[autofolder\] folder .+: 16 videos, 1 before and 14 after Episode 2\.mkv; added 15, re-added 0, removed 0; 1 moves; \d+ ms \(scan \d+ ms\)$'
+        )
+    }
 )
 
-function Invoke-TestCase {
-    # Runs one case; writes its report and returns $true when it passed.
+function Invoke-VlcCase {
+    # Runs a case's VLC; returns the driver's result lines, VLC's log and the problems found.
     param([hashtable]$Spec)
     $out = Join-Path $testRoot "results\$($Spec.Name).txt"
     $log = Join-Path $testRoot "logs\$($Spec.Name).log"
     $intf = "luaintf{intf=$($Spec.Driver)}"
     if ($Spec.Autofolder) { $intf = "luaintf{intf=autofolder}:$intf" }
+    # An installed autofolder comes from vlcrc's extraintf: --extraintf would replace it,
+    # --control adds the driver after it (measured 2026-11-12).
+    $intfOption = if ($Spec.Install) { '--control' } else { '--extraintf' }
     $extra = if ($Spec.Config) { ',' + $Spec.Config } else { '' }
     $luaConfig = '{0}={{out=[[{1}]],media=[[{2}]],videos=[[{3}]],unc=[[{4}]]{5}}}' -f $Spec.Driver, $out, $media, $videoList, $uncMedia, $extra
     $vlcArgs = (Get-HeadlessVlcArgumentList -Log $log) + @(
         '--no-one-instance', '--no-one-instance-when-started-from-file'   # never hand files to another VLC
-        '--extraintf', "`"$intf`""
+        $intfOption, "`"$intf`""
         "--lua-config=`"$luaConfig`""
     )
     foreach ($file in $Spec.Files) {
@@ -209,11 +233,11 @@ function Invoke-TestCase {
         $vlcArgs += '"' + $file + '"'
     }
 
+    if ($Spec.Install) { Initialize-InstalledPortable }
     $settingsFile = Join-Path $portable 'autofolder.ini'
     if (Test-Path -LiteralPath $settingsFile) { Remove-Item -LiteralPath $settingsFile -Force }
     if ($Spec.Settings) { [IO.File]::WriteAllText($settingsFile, $Spec.Settings, (New-Object Text.UTF8Encoding($false))) }
 
-    $watch = [Diagnostics.Stopwatch]::StartNew()
     $process = Start-Process -FilePath $vlcExe -ArgumentList $vlcArgs -PassThru -WindowStyle Hidden
     $null = $process.Handle  # keeps the handle, so ExitCode is readable after exit (PowerShell 5.1)
     $timedOut = -not $process.WaitForExit($Spec.TimeoutSec * 1000)
@@ -221,16 +245,43 @@ function Invoke-TestCase {
         Stop-Process -Id $process.Id -Force
         $process.WaitForExit()
     }
-    $watch.Stop()
 
+    $run = @{ Log = $log; Lines = @(); LogLines = @(); Problems = @() }
+    if (Test-Path -LiteralPath $out) { $run.Lines = [IO.File]::ReadAllLines($out, [Text.Encoding]::UTF8) }
+    if (Test-Path -LiteralPath $log) { $run.LogLines = [IO.File]::ReadAllLines($log, [Text.Encoding]::UTF8) }
+    if ($timedOut) { $run.Problems += "VLC did not exit within $($Spec.TimeoutSec) s and was killed" }
+    elseif ($process.ExitCode -ne 0) { $run.Problems += "VLC exit code $($process.ExitCode)" }
+    $run
+}
+
+function Invoke-TestCase {
+    # Runs one case; writes its report and returns $true when it passed.
+    param([hashtable]$Spec)
+    $watch = [Diagnostics.Stopwatch]::StartNew()
     $problems = New-Object Collections.Generic.List[string]
     $lines = @()
-    if (Test-Path -LiteralPath $out) { $lines = [IO.File]::ReadAllLines($out, [Text.Encoding]::UTF8) }
     $logLines = @()
-    if (Test-Path -LiteralPath $log) { $logLines = [IO.File]::ReadAllLines($log, [Text.Encoding]::UTF8) }
+    $log = $null
+    try {
+        if ($Spec.Check) {
+            $lines = @(& $Spec.Check)
+        }
+        else {
+            $run = Invoke-VlcCase $Spec
+            $lines, $logLines, $log = $run.Lines, $run.LogLines, $run.Log
+            foreach ($problem in $run.Problems) { $problems.Add($problem) }
+        }
+    }
+    catch { $problems.Add("error: $_") }
+    finally {
+        # Back to the usual portable folder (lua\ and tests\lua\, no vlcrc) for the next cases.
+        if ($Spec.Install) {
+            try { Initialize-PortableLua }
+            catch { $problems.Add("error rebuilding the portable folder: $_") }
+        }
+    }
+    $watch.Stop()
 
-    if ($timedOut) { $problems.Add("VLC did not exit within $($Spec.TimeoutSec) s and was killed") }
-    elseif ($process.ExitCode -ne 0) { $problems.Add("VLC exit code $($process.ExitCode)") }
     if ($lines -notcontains 'done') { $problems.Add('the driver did not finish (no "done" line)') }
     foreach ($line in $lines) { if ($line -like 'fail *') { $problems.Add($line) } }
     # A Lua error in any script, except the "Interrupted." that ends a script when VLC closes:
@@ -256,7 +307,7 @@ function Invoke-TestCase {
     foreach ($line in $lines) { if ($line -ne 'done') { Write-Host "    $line" } }
     if (-not $passed) {
         foreach ($problem in $problems) { Write-Host "  ! $problem" -ForegroundColor Red }
-        Write-Host "  VLC log: $log"
+        if ($log) { Write-Host "  VLC log: $log" }
     }
     $passed
 }
@@ -285,6 +336,11 @@ foreach ($spec in $selected) {
     if ($spec.Unc -and -not (Test-Path -LiteralPath $uncMedia)) {
         # E.g. the admin share is off, or the account isn't a local administrator.
         Write-Host "SKIP $($spec.Name): $uncMedia can't be reached" -ForegroundColor Yellow
+        continue
+    }
+    # Checked now, not at the start: your VLC may have been opened during the run.
+    if ($spec.NoOtherVlc -and (Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne $vlcExe })) {
+        Write-Host "SKIP $($spec.Name): install.ps1 refuses to run while your VLC is open" -ForegroundColor Yellow
         continue
     }
     if (-not (Invoke-TestCase $spec)) { $failed++ }

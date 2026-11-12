@@ -1,9 +1,9 @@
 # To-dos
 
 ## Where we are
-- Now: To do 4 (install and uninstall scripts)
-- Next: To do 5
-- Updated: 2026-11-11
+- Now: To do 5 (README and manual test checklist)
+- Next: none
+- Updated: 2026-11-12
 
 The requirements are in [spec.md](spec.md), and the API facts and open questions in [research/vlc-lua-api.md](research/vlc-lua-api.md).
 
@@ -11,10 +11,10 @@ The requirements are in [spec.md](spec.md), and the API facts and open questions
 Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to-do, move its line.
 
 ### Now
-- To do 4: Install and uninstall scripts (medium): docs/todo/04-install-scripts.md
+- To do 5: README and manual test checklist (small): docs/todo/05-readme-manual-test.md
 
 ### Bugs me
-- To do 5: README and manual test checklist (small): docs/todo/05-readme-manual-test.md
+- none
 
 ### Someday
 - none yet
@@ -31,6 +31,7 @@ Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to
 - Pick a license and add a LICENSE file. Ask the user. *Suggested: MIT, or GPL-2.0-or-later to match VLC.*
 - Search all tracked files for the "Never in tracked files" list in CLAUDE.md. If old commits hold any of it, publish a new repo with one clean commit instead of rewriting history.
 - A fresh subagent that hasn't seen the project checks README.md and the docs it links against the code. It only reports; the user decides the fixes.
+- Download the repo as a zip, unpack it with Explorer and double-click `install.cmd`: if Windows warns first (the zip's files come "from the internet"), say in the README what to click. Also check the `.cmd` files have CRLF line endings in the zip.
 - A screenshot in the README (the playlist after opening one file, and the sort dialog).
 - Start CHANGELOG.md (Keep a Changelog: Unreleased first, then versions newest first) with the first version.
 

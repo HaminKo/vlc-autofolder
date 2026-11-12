@@ -12,8 +12,7 @@ In development. Built for VLC 3.0.24 on Windows 11. What works so far:
 - Opening a video of the same folder again leaves one copy of each file, adds new files, and removes items whose file was deleted.
 - Clicking an item, Next and Previous never change the playlist. Neither does opening several files at once or an .m3u playlist.
 - Large folders and network paths (`\\server\share\...`) work. In tests, a folder of 500 videos was in place within about half a second, and the file didn't start later. Network paths were tested through a share on the same PC; a real network share and mapped drives are still to be checked by hand.
-
-The install script is still to come.
+- Install and uninstall with a double-click (see Install below).
 
 ## Sort order and video types
 In VLC, choose **View → Auto Folder Playlist settings**. The dialog has the sort order and the video file types (separated by spaces; leave the field empty for the default list). **Save** applies them within about two seconds, without restarting VLC; **Cancel** (or closing the window) changes nothing. A wrong value in the settings file shows as a note in the dialog.
@@ -31,6 +30,8 @@ extensions=mp4 mkv avi
 - A wrong value is ignored (that setting keeps its default) and shows as a warning in Tools → Messages, e.g. `autofolder.ini line 1: unknown sort order "newest"`.
 
 ## Troubleshooting
+- **Nothing is added after the install:** VLC loads the script only when it starts, so close every VLC window and start it again. Tools → Messages (verbosity 2) should then show `[autofolder] started`; if it doesn't, close VLC and run the install again.
+- **It stopped working after a change in VLC's preferences:** in Tools → Preferences → All → Interface → Main interfaces, ticking or unticking a box there may rewrite the "Extra interface modules" text and drop `{intf=autofolder}`. Close VLC and run the install again.
 - **See what the script did:** Tools → Messages, verbosity 2 (debug). Its lines start with `[autofolder]`. After each build, one line gives the number of videos and how long it took, e.g. `folder D:\Shows\: 24 videos, 4 before and 19 after Episode 05.mkv; added 23, removed 0; 4 moves; 3 ms (scan 2 ms)`.
 - **Settings not applied:** at start, and after each change of the settings file, one line shows the settings in use and where it looked for the file, e.g. `settings: sort name-az; video types mp4 mkv avi (from C:\Users\you\AppData\Roaming\vlc\autofolder.ini)`, or `(defaults: no file ...)` when it found none. Check the file name: Notepad may have saved it as `autofolder.ini.txt`.
 - **No "Auto Folder Playlist settings" in the View menu:** `autofolder_dialog.lua` must be in `%APPDATA%\vlc\lua\extensions\`; then restart VLC. A script VLC couldn't load shows in Tools → Messages as `Error loading script ...autofolder_dialog.lua`.
@@ -43,16 +44,16 @@ extensions=mp4 mkv avi
 - When you remove a type from `extensions`, files of that type already in the playlist stay there until you open a video from another folder.
 - VLC 3.0's playlist window doesn't show items a script moves. So when folder videos have to change places (a new sort order, or a video of the folder opened again), the script removes those videos from the playlist and adds them again in their new place; the others stay. VLC then reads their lengths again, which is quick on a local disk and gradual on a network share. The playing video and items from other folders are never removed this way.
 
-## Install (planned)
-1. Close VLC.
-2. In PowerShell, in this folder, run:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\install.ps1
-   ```
-   It copies the Lua scripts to `%APPDATA%\vlc\lua\`, backs up VLC's settings file (`vlcrc`), and enables the script as an extra interface.
+## Install
+1. Close VLC (every window).
+2. Double-click `install.cmd` in this folder. A window shows what it did; press any key to close it.
+   It copies the Lua scripts to `%APPDATA%\vlc\lua\` and adds `luaintf{intf=autofolder}` to the "Extra interface modules" setting (`extraintf`) in VLC's settings file, `%APPDATA%\vlc\vlcrc`. Other entries in that setting stay. Before changing vlcrc it saves a copy next to it, e.g. `vlcrc.autofolder-20261112-153000.bak`. Only the `extraintf` line changes (it is added at the end if vlcrc has none).
 3. Start VLC and open any video.
 
-To remove it, run `.\uninstall.ps1` the same way.
+- **"VLC's settings file isn't there yet":** VLC writes vlcrc the first time it starts. Start VLC, click Continue on its first-start question, close it, and run the install again.
+- **Update:** get the new files and run the install again. It replaces the scripts; vlcrc and your settings stay as they are.
+- **In PowerShell instead:** `powershell -ExecutionPolicy Bypass -File .\install.ps1` (and `.\uninstall.ps1`) in this folder does the same; the `.cmd` files only start these scripts.
+- **Uninstall:** close VLC and double-click `uninstall.cmd`. It removes the scripts, your Auto Folder settings (`autofolder.ini`) and only its own entry from vlcrc (after saving another copy). Other VLC settings you changed since the install are kept. The `.bak` copies stay; delete them when you no longer need them.
 
 ## Development
 The tests run the real VLC 3.0.24 (a portable copy, so your own VLC settings are never touched) with no window. In Windows PowerShell, in this folder:

@@ -188,17 +188,31 @@ function Initialize-PortableLua {
     $portableLua = Join-Path $portable 'lua'
     New-Item -ItemType Directory -Force -Path $portableLua | Out-Null
     foreach ($source in @((Join-Path $root 'lua'), (Join-Path $root 'tests\lua'))) {
-        $prefix = (Get-Item -LiteralPath $source).FullName.TrimEnd('\') + '\'
-        Get-ChildItem -LiteralPath $source -Recurse -File | ForEach-Object {
-            if (-not $_.FullName.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
-                throw "Unexpected path $($_.FullName) outside $prefix"
-            }
-            $relative = $_.FullName.Substring($prefix.Length)
-            $target = Join-Path $portableLua $relative
-            if (Test-Path -LiteralPath $target) { throw "lua\ and tests\lua\ both have $relative" }
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
-            Copy-Item -LiteralPath $_.FullName -Destination $target
+        Copy-LuaFolder -Source $source -Target $portableLua
+    }
+}
+
+function Get-RelativeFile {
+    # The files under $Source, as paths relative to it (e.g. intf\autofolder.lua).
+    param([string]$Source)
+    $prefix = (Get-Item -LiteralPath $Source).FullName.TrimEnd('\') + '\'
+    Get-ChildItem -LiteralPath $Source -Recurse -File | ForEach-Object {
+        if (-not $_.FullName.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Unexpected path $($_.FullName) outside $prefix"
         }
+        $_.FullName.Substring($prefix.Length)
+    }
+}
+
+function Copy-LuaFolder {
+    # Copies the files under $Source into $Target, keeping subfolders. Throws when a file is
+    # already there (lua\ and tests\lua\ must not share a name).
+    param([string]$Source, [string]$Target)
+    foreach ($relative in Get-RelativeFile $Source) {
+        $file = Join-Path $Target $relative
+        if (Test-Path -LiteralPath $file) { throw "$file is already there (copying $Source)" }
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $file) | Out-Null
+        Copy-Item -LiteralPath (Join-Path $Source $relative) -Destination $file
     }
 }
 
