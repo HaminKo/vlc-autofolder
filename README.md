@@ -21,7 +21,7 @@ In development. Built for VLC 3.0.24 on Windows 11. What works so far ([details]
 4. Start VLC and open any video.
 
 - **"VLC's settings file isn't there yet":** VLC writes vlcrc the first time it starts. Start VLC, click Continue on its first-start question, close it, and run the install again.
-- **Update:** get the new files and run the install again. It replaces the scripts; vlcrc and your settings stay as they are.
+- **Update:** get the new files and run the install again. It replaces the scripts; vlcrc and your settings stay as they are. What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 - **Uninstall:** close VLC and double-click `uninstall.cmd` (click **Run** if Windows asks). It removes the scripts, your Auto Folder settings (`autofolder.ini`) and only its own entry from vlcrc (after saving another copy). Other VLC settings you changed since the install are kept. The `.bak` copies stay; delete them when you no longer need them.
 
 ## Settings

@@ -2,6 +2,12 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: Semantic versioning from 0.1.0; CHANGELOG.md in Keep a Changelog format
+- **Rule:** CHANGELOG.md in the repo root follows Keep a Changelog 1.1.0: Unreleased first, then versions newest first, each headed `## [X.Y.Z] - YYYY-MM-DD`. The first version is 0.1.0, dated 2026-11-14; if the repo goes public on another day, that date changes to it. The version number also stands in the settings dialog's `descriptor()` (`lua/extensions/autofolder_dialog.lua`, was `0.1`); a release changes both. Each change users can see gets one plain-language line under Unreleased (finish-step).
+- **Reason:** 0.x fits the README's "In development" status and the dialog's earlier `0.1`. Dating it now means no extra step on release day if nothing changes before then.
+- **Who:** the user (0.1.0, today's date), from Claude's suggestions; the Keep a Changelog format was already set in todo.md.
+- **Rejected:** 1.0.0 (says stable while the README says in development). Keeping everything under Unreleased until release day (a step to remember later). The compare links Keep a Changelog puts at the bottom (`[0.1.0]: https://github.com/...`): the repo URL names the personal account (CLAUDE.md, "Never in tracked files"), so the version headings stay plain text.
+
 ## 2026-11-14: The pre-release manual run stops after section 2; the user reports problems from normal use
 - **Rule:** for the public release, the manual checklist ran sections 0 to 2 (and 10.7, To do 8) by hand. Claude ran the automated tests and section 11 on the installed VLC from a script, plus a no-window start of the installed VLC; the rest was not run again (results: manual-test.md, "Runs"). After this, the user uses the tool as normal and reports what doesn't work.
 - **Reason:** the user didn't want to run the checklist again. Since its full run on 2026-11-13 only install.ps1 changed (To do 8), and the automated install checks, 10.7 and section 11 cover that. The Lua code that sections 3 to 10 check is unchanged.

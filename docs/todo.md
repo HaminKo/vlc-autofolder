@@ -1,7 +1,7 @@
 # To-dos
 
 ## Where we are
-- Now: Before a public release (no to-dos open)
+- Now: Public release of 0.1.0, by the user (no to-dos open)
 - Next: none
 - Updated: 2026-11-14
 
@@ -29,7 +29,7 @@ Next number: 9. Numbers are permanent: never renumber or reuse one; to move a to
 
 ## Before a public release
 - ~~Run docs/manual-test.md on the installed VLC again if the code changed since its full run (2026-11-13, To do 5).~~ Done 2026-11-14, in part: manual-test.md "Runs" and decisions.md.
-- Start CHANGELOG.md (Keep a Changelog: Unreleased first, then versions newest first) with the first version.
+- ~~Start CHANGELOG.md (Keep a Changelog: Unreleased first, then versions newest first) with the first version.~~ Done 2026-11-14: version 0.1.0 (decisions.md).
 
 ## Writing a to-do
 - Number: the "Next number" (then raise that line by one). The line goes under Someday, unless the user says it bugs them or wants it soon: then under Bugs me where the user says (at most 5 there, so ask which one drops back to Someday), and "Next:" and "Updated:" in "Where we are" change with it.

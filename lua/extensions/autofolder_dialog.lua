@@ -27,7 +27,7 @@ local note
 function descriptor()
     return {
         title = "Auto Folder Playlist settings",
-        version = "0.1",
+        version = "0.1.0",
         author = "vlc-autofolder",
         shortdesc = "Auto Folder Playlist settings",
         description = "The sort order and the video file types for the autofolder"

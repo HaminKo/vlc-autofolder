@@ -58,6 +58,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - The test VLC is the portable zip in `tools\vlc` with a `portable\` folder; test runs always pass `--no-one-instance` and `--no-crashdump`.
 - Public on GitHub later.
 - MIT license; the copyright line names "the vlc-autofolder authors", never a person or login.
+- Semantic versioning from 0.1.0; a release sets the number in CHANGELOG.md and in the dialog's `descriptor()`. The changelog has no compare links (the repo URL names the account).
 - The repo goes public with its full history; the commit author email stays as it is (no rewrite, no clean repo).
 - README.md lists each feature in one or two lines, linking to its section in docs/guide.md.
 - install.ps1 adds `luaintf{intf=autofolder}` to vlcrc's `extraintf` (never `lua-intf`), backs up vlcrc before each change and keeps every other byte; uninstall removes only that entry, our files and autofolder.ini. Both also remove a bare `lua` (what VLC's preferences page writes in place of ours) unless `rc-host`/`cli-host` is set; a bare `luaintf` stays.
@@ -70,6 +71,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 
 ## Project docs
 - README.md: for visitors; each feature in one or two lines, linking to docs/guide.md
+- CHANGELOG.md: Keep a Changelog; one plain-language line under Unreleased for each change users can see
 - docs/guide.md: the details for users (settings file, one-instance table, troubleshooting, limitations, install details)
 - docs/spec.md: the original brief
 - docs/local.md: this PC's paths and commands; gitignored
