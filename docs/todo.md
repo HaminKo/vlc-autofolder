@@ -8,7 +8,7 @@
 The requirements are in [spec.md](spec.md), and the API facts and open questions in [research/vlc-lua-api.md](research/vlc-lua-api.md).
 
 ## To do
-Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to-do, move its line.
+Next number: 8. Numbers are permanent: never renumber or reuse one; to move a to-do, move its line.
 
 ### Now
 - none
@@ -17,7 +17,7 @@ Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to
 - none
 
 ### Someday
-- none yet
+- To do 7: Playlist window sometimes shows a new folder in the wrong order (medium): docs/todo/07-window-order-race.md
 
 ## Later, only if the user asks
 - Subfolders (recursive).
@@ -28,7 +28,6 @@ Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to
 - Linux and macOS.
 
 ## Before a public release
-- A screenshot in the README (the playlist after opening one file, and the sort dialog).
 - Run docs/manual-test.md on the installed VLC again if the code changed since its full run (2026-11-13, To do 5).
 - Start CHANGELOG.md (Keep a Changelog: Unreleased first, then versions newest first) with the first version.
 
