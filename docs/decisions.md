@@ -2,6 +2,13 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: GitHub settings after going public: main is protected; secret scanning stays off
+- **Rule:** a ruleset "Protect main" on the default branch blocks deleting it and force-pushing to it, with no bypass (not even the owner). Normal pushes need no pull request or review. To rewrite history on purpose (e.g. to remove a committed secret), turn the ruleset off in Settings → Rules → Rulesets, push, and turn it on again.
+- **Reason:** the history is public now; a force-push would leave every clone out of step with GitHub.
+- **Who:** the user, taking Claude's suggestion. Secret scanning and push protection were suggested and left off (the user moved on without turning them on).
+- **Also:** the Projects tab is off (unused; the to-dos are in docs/todo.md).
+- **Skipped for now:** a social preview image (GitHub's own card shows the name and description; `playlist.png` is 1122×696, not 2:1, so sites would crop it, and its text is unreadable at thumbnail size), issue templates, CONTRIBUTING and Code of Conduct (no reports yet; a bug-report template once the first vague report comes), private vulnerability reporting and Dependabot (no dependencies, no server), a CI workflow (a to-do if wanted).
+
 ## 2026-11-14: The repo is public, with version 0.1.0 as a tag and a GitHub Release
 - **Rule:** the GitHub repo was switched to public on 2026-11-14, after the push of the changelog commit. Before that: the description "Open one video in VLC and the rest of its folder is added to the playlist automatically (VLC 3.0, Windows)", the topics vlc, vlc-lua, playlist, lua, windows, and an annotated tag `v0.1.0` with a GitHub Release "0.1.0" whose notes are the changelog's 0.1.0 section plus "To install, see Install in the README." Each later release does the same: tag `vX.Y.Z`, Release notes from its changelog section. The README's install steps stay on Code → Download ZIP.
 - **How it was checked:** the privacy scan over every commit (decisions entry below) was run again on all 25 commits for the user folder name, the PC name, the login, the email's local part and "OneDrive": no hit in any file or commit message. After the switch, without signing in: the main zip downloaded (HTTP 200) and holds the folder `vlc-autofolder-main` (as the README's install step says) with `install.cmd` and `uninstall.cmd` in CRLF, and no docs/local.md; the release page answered 200.

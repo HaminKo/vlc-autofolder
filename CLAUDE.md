@@ -56,7 +56,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - The core is a Lua interface script loaded at startup via the extra-interface setting (not an extension, not a playlist script).
 - Tests run the real VLC 3.0.24 with no window, isolated from the real settings; there is no screenshot GUI test.
 - The test VLC is the portable zip in `tools\vlc` with a `portable\` folder; test runs always pass `--no-one-instance` and `--no-crashdump`.
-- Public on GitHub since 2026-11-14 (version 0.1.0).
+- Public on GitHub since 2026-11-14 (version 0.1.0). Main can't be force-pushed or deleted (ruleset "Protect main").
 - MIT license; the copyright line names "the vlc-autofolder authors", never a person or login.
 - Semantic versioning from 0.1.0; a release sets the number in CHANGELOG.md and in the dialog's `descriptor()`, then gets an annotated tag `vX.Y.Z` and a GitHub Release whose notes are its changelog section. The changelog has no compare links (the repo URL names the account).
 - The repo goes public with its full history; the commit author email stays as it is (no rewrite, no clean repo).
