@@ -2,6 +2,12 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: README pictures: made by a script with the portable VLC and a demo folder
+- **Rule:** `docs/images/playlist.png` (the playlist after opening only "Lecture 4 - Loops.mkv") and `docs/images/settings.png` (the settings dialog) are made by `tests\make-screenshots.ps1` (run by hand) from the portable test VLC, never the installed one. The demo folder is 10 files "Lecture 1 - Introduction.mkv" … "Lecture 10 - Review.mkv" in `%TEMP%`, each a 2-minute solid-colour YUV4MPEG2 video, dated one day apart. How the window is set up and captured: research/vlc-lua-api.md, "Screenshots of the Qt window".
+- **Reason:** no private file names on GitHub, the user's VLC settings stay untouched, and the pictures can be made again after a change.
+- **Who:** the user asked Claude to script it.
+- **Rejected:** screenshots by hand (the user preferred a script); the user's own videos (private names).
+
 ## 2026-11-14: The README is short; the details are in docs/guide.md
 - **Rule:** README.md keeps what it does, a short Status list (one or two lines per feature, linking to the guide), Install (with a "Download ZIP → Extract All" step, Update and Uninstall), Settings in one paragraph, two troubleshooting lines plus a link, Development, Credits and License. docs/guide.md holds the rest, moved word for word: What works (the old Status list), Sort order and video types, When VLC is already open, Troubleshooting, Limitations and Install details. Only three things changed in the moved text: "see Install below" became a link to the README, "It copies" became "The install copies", and "in this folder" became "in the project folder".
 - **Reason:** the README was 2,406 words, with Install at line 76 of 101 (measured); the README rule in the user's CLAUDE.md wants install near the top and details in docs/.

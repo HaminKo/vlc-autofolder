@@ -133,6 +133,7 @@ When a fact turns out wrong, mark it wrong here and say what replaced it; don't 
     - From the same source, **not measured**:
       - VLC hands the "item added" event to the window's thread with `QApplication::postEvent` (input_manager.cpp), and the window places the item at its index in the playlist **when it handles the event**. So an item that is added and then moved shows in the right place only if the window handles the event after the move.
       - In the To do 2 build, 4 items were added and then moved before the opened file. The window showed them in the right place (one manual test).
+      - **The race does show (measured 2026-11-14, README screenshots):** the portable VLC started with the docked playlist visible and `Lecture 4 - Loops.mkv` of a 10-file folder (build: `3 before and 6 after`, `3 moves`). In 1 of 7 captures the window showed 4, 2, 3, 1, 5 … 10 instead of 1 … 10; the other 6 were right. In 4 of the right runs a second Lua interface logged the real playlist order 4 s after start: 1 … 10 each time (the wrong run had no such log, so its real order is inferred, not measured). Not measured: how often it happens on the installed VLC, and whether it also happens while the playlist is hidden.
       - The window re-reads the whole playlist (`rebuild`) when its search text changes (`filter`) and when its root item is removed.
     - **So a re-sort deletes and re-adds the items** (decisions.md, 2026-11-11). The settings-live case checks that the re-sorted items have new ids. **Measured by hand (2026-11-11, To do 3 step A tests 3–6):** 15 items re-added and placed, 5 sort changes in a row. The window showed the new order every time, with no item in a wrong row, so the race above didn't show.
     - **Also in a build (measured 2026-11-11, step A test 8):** Ctrl+O on Episode 2.mkv again, with its folder built (16 videos, date order). The new copy played, and the build moved it into the old copy's place (2nd). The window showed it **at the bottom**. That is To do 6.
@@ -253,6 +254,14 @@ Files: modules/lua/extension.c, extension_thread.c, libs/dialog.c, modules/gui/q
   - An escaped `<` in a label shows as `<`, and `<span style="color:...">` colours the text.
   - Escape calls `close()`.
   - Not tested: clicking the menu entry while the dialog is open.
+
+## Screenshots of the Qt window (measured 2026-11-14, README pictures, portable test VLC)
+- The script: `tests\make-screenshots.ps1`. Everything below is what it relies on. Its first run didn't open the dialog (keys sent, View menu not open); since then it checks that the menu opened (a visible popup window of VLC) and retries, and both runs after that change worked (measured 2026-11-14, ~15 s each).
+- The portable VLC keeps its Qt settings in `tools\vlc\portable\vlc\vlc-qt-interface.ini` (not next to vlcrc). Written before the start, `[MainWindow] playlist-visible=true`, `pl-dock-status=true` and `[Playlist] view-mode=2` start it with the docked playlist in the List view (full names with `[02:00]` lengths; the default Detailed view cuts the names).
+- When a video starts, the window switches from the playlist to the video; `--no-video` keeps the playlist.
+- VLC 3.0.24's Qt exposes no UI Automation children (0 descendants), so its menus can't be clicked through UI Automation. Keys work once VLC is the foreground window: Alt+I opens View; the extensions are its last entries (Auto Folder Playlist settings, then VLsub), so Up twice and Enter opens the dialog. Its title is "Auto Folder Playlist".
+- A background PowerShell can't simply call `SetForegroundWindow`; attaching to the foreground window's input (`AttachThreadInput`) with an Alt press first worked, but not every time. Keys sent while VLC isn't in front go to whatever window is, so check first.
+- `PrintWindow` with `PW_RENDERFULLCONTENT`, cropped to the DWM frame (`DWMWA_EXTENDED_FRAME_BOUNDS`), gives a clean window picture. With two screens at different scales the dialog may open on the other one: the capturing process must be per-monitor DPI aware, and the dialog is moved next to the main window first.
 
 ## Prior art (searched 2026-11-10)
 - No ready-made auto-starting interface script for VLC 3 was found.

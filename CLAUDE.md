@@ -23,6 +23,7 @@ Don't build what's under "Later" in docs/todo.md until asked.
 - A test case = an entry in `$cases` in run-tests.ps1 + a driver `tests\lua\intf\test_*.lua` using `require "testlib"` (or a `Check` script block, no VLC: the install checks in `tests\InstallChecks.ps1`). The runner also fails on any `lua error:` log line except the "Interrupted." that ends a script on exit. Shared paths, test media and VLC options: `tests\TestCommon.ps1`.
 - Tests run install.ps1 / uninstall.ps1 only with `-VlcDir` (a temp folder or `tools\vlc\portable`); the two install cases are skipped while the user's own VLC is open.
 - By hand only, with every VLC closed: `tests\spike-one-instance.ps1` (one-instance hand-over; ~35 s, estimated).
+- By hand, for the README pictures: `tests\make-screenshots.ps1` rewrites `docs\images\playlist.png` and `settings.png` (a test VLC window for ~15 s, measured; don't click or type meanwhile; check the playlist order in the picture).
 - No screenshot GUI test (see Decisions). The Qt parts, Explorer and the one-instance settings are in the manual checklist, docs/manual-test.md (real VLC, ~40 min, estimated).
 
 **Code rules** (from docs/research/vlc-lua-api.md):

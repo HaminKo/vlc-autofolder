@@ -4,6 +4,8 @@ Open one video in VLC and the rest of its folder is added to the playlist automa
 
 When you open a single video file in VLC 3.0 on Windows (for example by double-clicking it in File Explorer), a small Lua script that runs in the background adds every other video in the same folder to the playlist. It keeps them in your chosen sort order (date modified or natural name order), with the opened file in its correct place. The file you opened keeps playing. You don't have to open the folder or click anything.
 
+![VLC's playlist after opening only "Lecture 4 - Loops.mkv": the other nine lectures of its folder are added before and after it, in order](docs/images/playlist.png)
+
 ## Status
 In development. Built for VLC 3.0.24 on Windows 11. What works so far ([details](docs/guide.md#what-works)):
 - **Opening a video** by double-click, Open File, or a drop on the video picture. Its folder goes at the end of the playlist; your own items stay.
@@ -24,6 +26,8 @@ In development. Built for VLC 3.0.24 on Windows 11. What works so far ([details]
 
 ## Settings
 In VLC, choose **View → Auto Folder Playlist settings**: the sort order (by date modified or by name, either way round; the default is date modified, oldest first) and the video file types. **Save** applies them without restarting VLC. The settings file and its values: [Sort order and video types](docs/guide.md#sort-order-and-video-types).
+
+![The Auto Folder Playlist settings dialog: a sort order list and a video types field, with Save and Cancel](docs/images/settings.png)
 
 ## Troubleshooting
 - **Nothing is added after the install:** VLC loads the script only when it starts, so close every VLC window and start it again.
