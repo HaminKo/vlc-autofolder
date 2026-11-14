@@ -161,7 +161,7 @@ The three settings are in Tools → Preferences (Show settings: Simple) → Inte
 
 ## 11. Uninstall and install again
 1. Close VLC. Double-click `uninstall.cmd` in the project folder.
-   See: `Removed 4 files from ...`, `Removed the settings file ...autofolder.ini`, `Backed up vlcrc to ...`, `vlcrc: removed luaintf{intf=autofolder} from extraintf`, then `Uninstalled.` in green.
+   See: `Removed 4 files from ...`, `Removed the settings file ...autofolder.ini` (only if there is one), `Backed up vlcrc to ...`, `vlcrc: removed luaintf{intf=autofolder} from extraintf`, then `Uninstalled.` in green.
 2. vlcrc differs from the backup the uninstall made only in the extraintf line:
    ```powershell
    $baks = @(Get-ChildItem "$env:APPDATA\vlc\vlcrc.autofolder-*.bak" | Sort-Object Name); Compare-Object (Get-Content $baks[-1].FullName) (Get-Content "$env:APPDATA\vlc\vlcrc")
@@ -176,3 +176,14 @@ The three settings are in Tools → Preferences (Show settings: Simple) → Inte
    See: `True`.
 6. Double-click `Episode 1.mkv`. See: the 16 videos. Close VLC.
 7. The `vlcrc.autofolder-*.bak` files in `%APPDATA%\vlc` can be deleted now, or kept.
+
+## Runs
+Full runs on the installed VLC. A difference from "See" is listed with its step, and what was fixed.
+- 2026-11-13 (To do 5): the whole list once, over several sessions; the details are in [archive/05-readme-manual-test.md](archive/05-readme-manual-test.md).
+- 2026-11-14, before the public release. Code changed since the last run: install.ps1 only (To do 8). Step 10.7 passed earlier that day (To do 8). The installed Lua files were the repo's (same hashes). The one-instance settings at the start: "Allow only one instance" off, "Use only one instance when started from file manager" off (the user's choice from the last run), "Enqueue ..." off.
+  - 0: 0.1, 0.2 (`build-big` passed; the media folder matched 0.3's list, `.dot-hidden.mkv` and `attribute-hidden.mkv` included, and `big\` held 500 files), 0.5 (no settings file) and 0.6 (`3.0.24` three times) checked by Claude. 0.3 and 0.4 passed (the user).
+  - 1: 1.1 passed (an update: no change to vlcrc, no new backup; Claude checked after: `extraintf=luaintf{intf=autofolder}`, the 4 files as in the repo). 1.2 skipped (first install only).
+  - 2: passed (the user).
+  - 3 to 9 and 10.1 to 10.6: not run again. The user stopped the manual run after section 2 (decisions.md, 2026-11-14). The Lua code is the same as in the 2026-11-13 run, which passed them.
+  - The automated tests: 23 cases, 0 failures, 100.7 s (measured).
+  - 11, by Claude from a script, VLC closed: 11.1, 11.2, 11.4 and 11.5 passed; after the reinstall vlcrc was byte for byte what it was before. 11.1 printed no `Removed the settings file` line because there was no settings file: its "See:" now says "only if there is one". 11.3 not run. In place of 11.6: the installed VLC with no window (`--intf dummy`, the real vlcrc) on `Episode 1.mkv` logged `started`, the default settings and `16 videos, 2 before and 13 after Episode 1.mkv; added 15`, with no `lua error` line; it changed nothing in `%APPDATA%\vlc`.

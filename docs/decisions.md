@@ -2,6 +2,12 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: The pre-release manual run stops after section 2; the user reports problems from normal use
+- **Rule:** for the public release, the manual checklist ran sections 0 to 2 (and 10.7, To do 8) by hand. Claude ran the automated tests and section 11 on the installed VLC from a script, plus a no-window start of the installed VLC; the rest was not run again (results: manual-test.md, "Runs"). After this, the user uses the tool as normal and reports what doesn't work.
+- **Reason:** the user didn't want to run the checklist again. Since its full run on 2026-11-13 only install.ps1 changed (To do 8), and the automated install checks, 10.7 and section 11 cover that. The Lua code that sections 3 to 10 check is unchanged.
+- **Who:** the user (stop the manual run); what replaces it was Claude's suggestion.
+- **Rejected:** automating the checklist's GUI steps (Explorer double-clicks, drops, the Qt playlist window, the dialog, one-instance hand-over). That would be a large build for code that hasn't changed, and a screenshot GUI test was already turned down (CLAUDE.md, Decisions). The checklist stays for changes to those parts.
+
 ## 2026-11-14: Install and uninstall remove a bare `lua` from extraintf, unless a CLI host is set
 - **Rule:** in the `extraintf` line install edits (the last one), a bare `lua` entry is removed and ours added; uninstall removes it from every `extraintf=` line along with ours. Kept when vlcrc has an uncommented `rc-host=` or `cli-host=` line with a value. A bare `luaintf` is always kept. Each removal prints its own line. This amends the 2026-11-12 rule "adds one extraintf entry; uninstall removes only that entry".
 - **Reason:** saving Tools → Preferences → All → Interface → Main interfaces turns our entry into `lua` (measured 2026-11-14), which starts VLC's command-line interface (`cli.luac`), not autofolder: a Terminal window opens with VLC (seen by the user). Without a host, that CLI is of no use on Windows, so the `lua` is our entry as the page rewrote it; with a host, someone uses the CLI on purpose. Uninstall removes it too, or uninstalling after saving that page would leave the CLI on.

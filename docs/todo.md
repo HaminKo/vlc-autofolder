@@ -28,7 +28,7 @@ Next number: 9. Numbers are permanent: never renumber or reuse one; to move a to
 - Linux and macOS.
 
 ## Before a public release
-- Run docs/manual-test.md on the installed VLC again if the code changed since its full run (2026-11-13, To do 5).
+- ~~Run docs/manual-test.md on the installed VLC again if the code changed since its full run (2026-11-13, To do 5).~~ Done 2026-11-14, in part: manual-test.md "Runs" and decisions.md.
 - Start CHANGELOG.md (Keep a Changelog: Unreleased first, then versions newest first) with the first version.
 
 ## Writing a to-do
