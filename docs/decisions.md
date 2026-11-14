@@ -48,6 +48,7 @@ One entry per decision, newest first. Each entry has the date and the decision a
   - Setting it up from inside VLC: a Lua script can't save vlcrc.
   - Install waiting for VLC to close instead of stopping: with the window open, double-clicking again is as easy, and a prompt could hang an unattended run.
 - **Not checked:** whether Windows warns before running a `.cmd` from a downloaded zip (Mark of the Web); a "Before a public release" item.
+  - **Checked 2026-11-14** (the user, Windows 11, GitHub's Code → Download ZIP, then Explorer's Extract All): it warns. Double-clicking `install.cmd` shows "Open File - Security Warning: The publisher could not be verified. Are you sure you want to run this software?" (Unknown Publisher); after Run the install worked (the installed scripts were the zip's copies). Extract All gives `vlc-autofolder-main\vlc-autofolder-main\`. Every extracted file carries `Zone.Identifier` ZoneId=3, and the installed scripts keep it (VLC doesn't mind). The `.cmd` files in the zip are CRLF (17 and 3 lines, no bare LF); `-ExecutionPolicy Bypass` runs the marked `.ps1` without a prompt. The README says to click Run and names the inner folder.
 
 ## 2026-11-12: install.ps1 adds one extraintf entry; uninstall removes only that entry, our files and autofolder.ini
 - **Rule:**

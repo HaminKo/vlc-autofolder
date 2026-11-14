@@ -14,13 +14,13 @@ In development. Built for VLC 3.0.24 on Windows 11. What works so far ([details]
 ## Install
 1. On GitHub, click **Code → Download ZIP**, then right-click the zip and choose **Extract All**.
 2. Close VLC (every window).
-3. Double-click `install.cmd` in the extracted folder (it may be one folder further in, e.g. `vlc-autofolder-main`). A window shows what it did; press any key to close it.
+3. Open the extracted folder, then the `vlc-autofolder-main` folder inside it, and double-click `install.cmd`. Windows asks "The publisher could not be verified. Are you sure you want to run this software?", because the file came from the internet: click **Run**. A window shows what it did; press any key to close it.
    It copies the Lua scripts into VLC's user folder and adds autofolder to VLC's settings file (vlcrc), after saving a copy of that file ([details](docs/guide.md#install-details)).
 4. Start VLC and open any video.
 
 - **"VLC's settings file isn't there yet":** VLC writes vlcrc the first time it starts. Start VLC, click Continue on its first-start question, close it, and run the install again.
 - **Update:** get the new files and run the install again. It replaces the scripts; vlcrc and your settings stay as they are.
-- **Uninstall:** close VLC and double-click `uninstall.cmd`. It removes the scripts, your Auto Folder settings (`autofolder.ini`) and only its own entry from vlcrc (after saving another copy). Other VLC settings you changed since the install are kept. The `.bak` copies stay; delete them when you no longer need them.
+- **Uninstall:** close VLC and double-click `uninstall.cmd` (click **Run** if Windows asks). It removes the scripts, your Auto Folder settings (`autofolder.ini`) and only its own entry from vlcrc (after saving another copy). Other VLC settings you changed since the install are kept. The `.bak` copies stay; delete them when you no longer need them.
 
 ## Settings
 In VLC, choose **View → Auto Folder Playlist settings**: the sort order (by date modified or by name, either way round; the default is date modified, oldest first) and the video file types. **Save** applies them without restarting VLC. The settings file and its values: [Sort order and video types](docs/guide.md#sort-order-and-video-types).

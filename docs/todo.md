@@ -28,7 +28,6 @@ Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to
 - Linux and macOS.
 
 ## Before a public release
-- Download the repo as a zip, unpack it with Explorer and double-click `install.cmd`: if Windows warns first (the zip's files come "from the internet"), say in the README what to click. Also check the `.cmd` files have CRLF line endings in the zip.
 - A screenshot in the README (the playlist after opening one file, and the sort dialog).
 - Run docs/manual-test.md on the installed VLC again if the code changed since its full run (2026-11-13, To do 5).
 - Start CHANGELOG.md (Keep a Changelog: Unreleased first, then versions newest first) with the first version.
