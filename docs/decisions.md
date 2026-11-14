@@ -2,6 +2,12 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: The README is short; the details are in docs/guide.md
+- **Rule:** README.md keeps what it does, a short Status list (one or two lines per feature, linking to the guide), Install (with a "Download ZIP → Extract All" step, Update and Uninstall), Settings in one paragraph, two troubleshooting lines plus a link, Development, Credits and License. docs/guide.md holds the rest, moved word for word: What works (the old Status list), Sort order and video types, When VLC is already open, Troubleshooting, Limitations and Install details. Only three things changed in the moved text: "see Install below" became a link to the README, "It copies" became "The install copies", and "in this folder" became "in the project folder".
+- **Reason:** the README was 2,406 words, with Install at line 76 of 101 (measured); the README rule in the user's CLAUDE.md wants install near the top and details in docs/.
+- **Who:** the user, taking Claude's suggestions (trim-readme skill).
+- **Rejected:** a root GUIDE.md (docs/ already holds the other docs), a `<details>` block per feature (still one long page on GitHub, and harder to link), and only reordering sections (Install comes sooner, but the page stays long).
+
 ## 2026-11-14: Pre-release docs review: what was fixed and what was left
 - **Rule:** a fresh subagent checked README.md and docs/manual-test.md against the code (13 findings). Fixed: the checklist's missing setup-tools step, the uninstall message order, the test-output quote and the `.dot-hidden.mkv` note in Explorer; in the README, "never change the playlist", how a wrong `extensions` value is handled and where a start-time warning shows, and the missing-`autofolder_settings.lua` entry. The `.m3u` claim now says "of several files". Left as they are: "within about two seconds" (worked out as ~1.2-2.4 s from the code, not measured), a dot-named file you open yourself staying in the playlist, and the install's "VLC is running" message not being quoted.
 - **Reason:** the ones left are fair as written or edge cases, and the README should get shorter, not longer. A one-entry `.m3u` may build its file's folder (inferred, not tested); the new wording is true either way.

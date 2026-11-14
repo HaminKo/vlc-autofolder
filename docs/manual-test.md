@@ -132,7 +132,7 @@ Continuing from 8.2 (VLC and Messages open).
    ```
 
 ## 10. One instance and enqueue mode
-The three settings are in Tools → Preferences (Show settings: Simple) → Interface, under "Playlist and Instances". Note their values first; the defaults are: "Allow only one instance" off, "Use only one instance when started from file manager" on, "Enqueue items into playlist in one instance mode" off. A change applies from the next VLC start. The README's table "When VLC is already open" must match what you see. If every double-click opens a new VLC whatever the settings, check step 0.6: on the dev PC that was the cause (2026-11-13, research/vlc-lua-api.md "One-instance mode").
+The three settings are in Tools → Preferences (Show settings: Simple) → Interface, under "Playlist and Instances". Note their values first; the defaults are: "Allow only one instance" off, "Use only one instance when started from file manager" on, "Enqueue items into playlist in one instance mode" off. A change applies from the next VLC start. The table "When VLC is already open" in [guide.md](guide.md#when-vlc-is-already-open) must match what you see. If every double-click opens a new VLC whatever the settings, check step 0.6: on the dev PC that was the cause (2026-11-13, research/vlc-lua-api.md "One-instance mode").
 1. **Defaults, VLC started by a double-click.** VLC closed. Double-click `Episode 1.mkv`, then `Season 2\Episode 1.mkv`.
    See: one VLC window; the second file plays in it; the playlist holds Season 2's 2 videos. Close VLC.
 2. **Defaults, VLC from the Start menu.** Start VLC from the Start menu, then double-click `Episode 2.mkv`.

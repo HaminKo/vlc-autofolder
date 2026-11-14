@@ -27,7 +27,7 @@ Only when the user has tested the whole step. If part of the test failed, fix th
   - `- Updated: YYYY-MM-DD`: today.
   - When a to-do is finished, its line leaves "### Now": ask the user which to-do goes there (suggest the first under Bugs me) and move that line up.
 - Update the docs the change affects (CLAUDE.md "Build specifics": Docs to update):
-  - README.md
+  - README.md (the short list) and docs/guide.md (the details)
   - docs/manual-test.md
   - docs/research/vlc-lua-api.md
 - If CHANGELOG.md exists and users can see the change, add one plain-language line under Unreleased (not for refactors or tests).

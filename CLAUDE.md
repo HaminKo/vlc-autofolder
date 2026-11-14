@@ -37,7 +37,8 @@ Don't build what's under "Later" in docs/todo.md until asked.
 - install.cmd / uninstall.cmd only start the `.ps1` files (logic goes there) and keep CRLF line endings (`.gitattributes`).
 
 **Docs to update when behaviour changes:**
-- README.md: features, install, sort switch, troubleshooting, limitations, Credits.
+- README.md: what it does, the short feature list, install, settings in short, Credits.
+- docs/guide.md: the details, moved from the README word for word (what works, sort order and video types, when VLC is already open, troubleshooting, limitations, install details).
 - docs/manual-test.md: a step for each new or changed thing the user does by hand.
 - docs/research/vlc-lua-api.md, when an API fact is confirmed or turns out wrong (mark it; don't delete it).
 - When a README section grows past about a screen, move it into docs/NAME.md and link it from the README.
@@ -57,6 +58,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - Public on GitHub later.
 - MIT license; the copyright line names "the vlc-autofolder authors", never a person or login.
 - The repo goes public with its full history; the commit author email stays as it is (no rewrite, no clean repo).
+- README.md lists each feature in one or two lines, linking to its section in docs/guide.md.
 - install.ps1 adds `luaintf{intf=autofolder}` to vlcrc's `extraintf` (never `lua-intf`), backs up vlcrc before each change and keeps every other byte; uninstall removes only that entry, our files and autofolder.ini.
 - The folder sits where the playing item is (in a build the opened file, so at the end), else where its first item is; the user's own items keep their order around it.
 - Only a file just opened builds: the playlist's last item (by position, not id), started within 10 s of becoming last (the first play after VLC starts always counts). One copy per folder file.
@@ -66,7 +68,8 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - VLC 3.0's playlist window doesn't show a script's moves: build and re-sort (`place`) delete and re-add the folder items that must change order; items that keep their id keep their order. Never re-added: the playing item, the user's items outside the folder.
 
 ## Project docs
-- README.md
+- README.md: for visitors; each feature in one or two lines, linking to docs/guide.md
+- docs/guide.md: the details for users (settings file, one-instance table, troubleshooting, limitations, install details)
 - docs/spec.md: the original brief
 - docs/local.md: this PC's paths and commands; gitignored
 - docs/todo.md: the list; docs/todo/: one file per to-do, with a Progress list once it is built in steps
