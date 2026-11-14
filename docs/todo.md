@@ -1,20 +1,20 @@
 # To-dos
 
 ## Where we are
-- Now: Before a public release (no to-dos open)
-- Next: none
+- Now: Before a public release; To do 8 first (it must land before the release)
+- Next: To do 8
 - Updated: 2026-11-14
 
 The requirements are in [spec.md](spec.md), and the API facts and open questions in [research/vlc-lua-api.md](research/vlc-lua-api.md).
 
 ## To do
-Next number: 8. Numbers are permanent: never renumber or reuse one; to move a to-do, move its line.
+Next number: 9. Numbers are permanent: never renumber or reuse one; to move a to-do, move its line.
 
 ### Now
 - none
 
 ### Bugs me
-- none
+- To do 8: Install repairs the entry VLC's preferences page rewrites to `lua` (small): docs/todo/08-prefs-page-lua.md
 
 ### Someday
 - To do 7: Playlist window sometimes shows a new folder in the wrong order (medium): docs/todo/07-window-order-race.md
