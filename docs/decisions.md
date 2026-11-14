@@ -2,6 +2,12 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: The repo is public, with version 0.1.0 as a tag and a GitHub Release
+- **Rule:** the GitHub repo was switched to public on 2026-11-14, after the push of the changelog commit. Before that: the description "Open one video in VLC and the rest of its folder is added to the playlist automatically (VLC 3.0, Windows)", the topics vlc, vlc-lua, playlist, lua, windows, and an annotated tag `v0.1.0` with a GitHub Release "0.1.0" whose notes are the changelog's 0.1.0 section plus "To install, see Install in the README." Each later release does the same: tag `vX.Y.Z`, Release notes from its changelog section. The README's install steps stay on Code → Download ZIP.
+- **How it was checked:** the privacy scan over every commit (decisions entry below) was run again on all 25 commits for the user folder name, the PC name, the login, the email's local part and "OneDrive": no hit in any file or commit message. After the switch, without signing in: the main zip downloaded (HTTP 200) and holds the folder `vlc-autofolder-main` (as the README's install step says) with `install.cmd` and `uninstall.cmd` in CRLF, and no docs/local.md; the release page answered 200.
+- **Who:** the user ("make this public now"; Claude ran the steps), taking Claude's suggestions for the description, topics and release.
+- **Rejected:** a tag without a Release (visitors look for versions on the Releases page); install steps that point to the Release's zip (its folder is `vlc-autofolder-0.1.0`, checked in the tag's zip, so the README's folder name would be wrong, and the main zip is always the newest).
+
 ## 2026-11-14: Semantic versioning from 0.1.0; CHANGELOG.md in Keep a Changelog format
 - **Rule:** CHANGELOG.md in the repo root follows Keep a Changelog 1.1.0: Unreleased first, then versions newest first, each headed `## [X.Y.Z] - YYYY-MM-DD`. The first version is 0.1.0, dated 2026-11-14; if the repo goes public on another day, that date changes to it. The version number also stands in the settings dialog's `descriptor()` (`lua/extensions/autofolder_dialog.lua`, was `0.1`); a release changes both. Each change users can see gets one plain-language line under Unreleased (finish-step).
 - **Reason:** 0.x fits the README's "In development" status and the dialog's earlier `0.1`. Dating it now means no extra step on release day if nothing changes before then.
@@ -241,6 +247,7 @@ Refines the two 2026-11-11 entries below ("A folder is built only for a file tha
 - **Test videos:** a raw YUV4MPEG2 video written by PowerShell (2 min, 32x32, 1 frame/s, 185 KB), saved under every video extension. VLC plays it whatever the extension (measured as .mkv and .mp4), so no ffmpeg is needed. Rejected: recording `screen://` with VLC, which would capture the user's screen.
 
 ## 2026-11-10: Public on GitHub later
+- **Done:** public since 2026-11-14 (entry above, "The repo is public").
 - **Reason:** a small VLC add-on is useful to others.
 - **Who:** the user, accepting Claude's suggestion.
 - **Consequence:** personal paths and the GitHub login used for pushes never go in tracked files.

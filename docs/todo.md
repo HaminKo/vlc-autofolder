@@ -1,7 +1,7 @@
 # To-dos
 
 ## Where we are
-- Now: Public release of 0.1.0, by the user (no to-dos open)
+- Now: Normal use since the 0.1.0 release; the user reports problems (no to-dos open)
 - Next: none
 - Updated: 2026-11-14
 
@@ -28,6 +28,7 @@ Next number: 9. Numbers are permanent: never renumber or reuse one; to move a to
 - Linux and macOS.
 
 ## Before a public release
+Released: 0.1.0, public on GitHub since 2026-11-14 (decisions.md).
 - ~~Run docs/manual-test.md on the installed VLC again if the code changed since its full run (2026-11-13, To do 5).~~ Done 2026-11-14, in part: manual-test.md "Runs" and decisions.md.
 - ~~Start CHANGELOG.md (Keep a Changelog: Unreleased first, then versions newest first) with the first version.~~ Done 2026-11-14: version 0.1.0 (decisions.md).
 
