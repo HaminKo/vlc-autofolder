@@ -28,7 +28,6 @@ Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to
 - Linux and macOS.
 
 ## Before a public release
-- Search all tracked files for the "Never in tracked files" list in CLAUDE.md. If old commits hold any of it, publish a new repo with one clean commit instead of rewriting history.
 - A fresh subagent that hasn't seen the project checks README.md and the docs it links against the code. It only reports; the user decides the fixes.
 - Download the repo as a zip, unpack it with Explorer and double-click `install.cmd`: if Windows warns first (the zip's files come "from the internet"), say in the README what to click. Also check the `.cmd` files have CRLF line endings in the zip.
 - A screenshot in the README (the playlist after opening one file, and the sort dialog).

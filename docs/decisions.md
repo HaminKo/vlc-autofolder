@@ -2,6 +2,14 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: The repo goes public with its history; the commit author email stays
+- **Rule:** no clean one-commit repo is needed: the privacy check (Before a public release) found no personal paths, PC name or GitHub login in any tracked file, any commit's files or any commit message. The commit author and committer (the repo's own git identity, name and email) stay as they are in all commits and will be public.
+- **How it was checked:** `git grep` over every commit (`git rev-list --all`) for the user folder name, the login, the PC name, email addresses, drive and UNC paths (every hit read: all are test or example paths such as `C:\F\a.mkv`, `D:\Shows\`, `\\127.0.0.1\C$\...`), plus the commit messages and the files that were tracked once and are gone now (only to-do files, moved to docs/archive/). docs/local.md was never committed.
+- **Who:** the user, taking Claude's suggestion.
+- **Rejected:**
+  - GitHub's noreply address for new commits: the address is the one chosen for this account, and the old commits would still show it.
+  - A new repo with one clean commit to hide the email: loses the history for no real gain.
+
 ## 2026-11-14: MIT license, "Copyright (c) 2026 the vlc-autofolder authors"
 - **Rule:** the repo is under the MIT license (LICENSE in the root, a License line in the README). The copyright line names "the vlc-autofolder authors", not a person. No license header in each source file.
 - **Reason:** all code is the project's own (nothing copied or adapted from VLC), so any license works. MIT is the short, usual choice for a small tool and is GPL-compatible, so it doesn't clash with VLC (GPL-2.0-or-later) running the scripts. The group name keeps the GitHub login out of tracked files (CLAUDE.md "Never in tracked files"); git history still records the author.
