@@ -23,7 +23,7 @@ Don't build what's under "Later" in docs/todo.md until asked.
 - A test case = an entry in `$cases` in run-tests.ps1 + a driver `tests\lua\intf\test_*.lua` using `require "testlib"` (or a `Check` script block, no VLC: the install checks in `tests\InstallChecks.ps1`). The runner also fails on any `lua error:` log line except the "Interrupted." that ends a script on exit. Shared paths, test media and VLC options: `tests\TestCommon.ps1`.
 - Tests run install.ps1 / uninstall.ps1 only with `-VlcDir` (a temp folder or `tools\vlc\portable`); the two install cases are skipped while the user's own VLC is open.
 - By hand only, with every VLC closed: `tests\spike-one-instance.ps1` (one-instance hand-over; ~35 s, estimated).
-- No screenshot GUI test (see Decisions). The Qt parts are in the manual checklist (docs/manual-test.md, from To do 5).
+- No screenshot GUI test (see Decisions). The Qt parts, Explorer and the one-instance settings are in the manual checklist, docs/manual-test.md (real VLC, ~40 min, estimated).
 
 **Code rules** (from docs/research/vlc-lua-api.md):
 - Lua 5.1 only: no `goto`, no `//`, no `utf8` library.
@@ -38,7 +38,7 @@ Don't build what's under "Later" in docs/todo.md until asked.
 
 **Docs to update when behaviour changes:**
 - README.md: features, install, sort switch, troubleshooting, limitations, Credits.
-- docs/manual-test.md, once it exists.
+- docs/manual-test.md: a step for each new or changed thing the user does by hand.
 - docs/research/vlc-lua-api.md, when an API fact is confirmed or turns out wrong (mark it; don't delete it).
 - When a README section grows past about a screen, move it into docs/NAME.md and link it from the README.
 
@@ -69,6 +69,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - docs/local.md: this PC's paths and commands; gitignored
 - docs/todo.md: the list; docs/todo/: one file per to-do, with a Progress list once it is built in steps
 - docs/archive/: finished to-dos' files, read only when a to-do names one
+- docs/manual-test.md: the manual test checklist, on the installed VLC
 - docs/decisions.md
 - docs/research/: one file per topic (vlc-lua-api.md so far)
 

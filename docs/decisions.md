@@ -2,6 +2,14 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-12: The manual checklist runs on the installed VLC; network paths through `\\127.0.0.1\C$` and a mapped drive
+- **Rule:** docs/manual-test.md is run by the user on their own installed VLC 3.0.24 (Explorer double-clicks with VLC as the default app for `.mkv`, the real vlcrc, the install scripts without `-VlcDir`). Network paths are tested through the PC's own admin share and a drive letter mapped to it.
+- **Reason:** the checklist covers what the headless tests can't reach (the Qt windows, Explorer, the one-instance settings, install on a real vlcrc), and those exist only in the installed VLC. The user has no network share.
+- **Who:** the user, taking Claude's suggestions (To do 5).
+- **Rejected:**
+  - The portable test VLC: Explorer doesn't open files with it, it has no real vlcrc to install into, and with the same version it would hand files to the installed VLC.
+  - A real network share: none available. The share on the same PC goes through the same UNC code path; a real share's speed is not measured.
+
 ## 2026-11-12: Double-click install.cmd and uninstall.cmd start the PowerShell scripts
 - **Rule:** `install.cmd` runs `install.ps1` with Windows PowerShell's full path and `-ExecutionPolicy Bypass`, passes its arguments and exit code on, and `pause`s so the window shows the result; `uninstall.cmd` is `install.cmd -Uninstall`. When install.ps1 isn't next to it (double-clicked inside Explorer's zip view, which extracts only that file), it says to extract the zip first. All logic stays in the `.ps1` files. `.gitattributes` keeps `.cmd` files CRLF in checkouts and GitHub zips.
 - **Reason:** typing a long PowerShell command in the right folder was the hard part of installing; a double-click is the usual way for small Windows tools.

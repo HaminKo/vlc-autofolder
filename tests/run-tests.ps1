@@ -348,9 +348,14 @@ foreach ($spec in $selected) {
 
 if (Get-TestVlcProcess) { Write-Host 'FAIL a test VLC is still running after the tests' -ForegroundColor Red; $failed++ }
 $userVlcAfter = Get-FolderSnapshot $userVlc
-if (Compare-Object @($userVlcBefore) @($userVlcAfter)) {
+$userVlcDiff = @(Compare-Object @($userVlcBefore) @($userVlcAfter))
+if ($userVlcDiff) {
     $hint = if ($ownVlcOpen) { ' (your own VLC was open: probably it, not the tests)' } else { '' }
     Write-Host "FAIL $userVlc changed during the tests$hint" -ForegroundColor Red
+    # Each entry is path|size|write time (UTC); a changed file shows a before and an after line.
+    foreach ($line in ($userVlcDiff | Sort-Object InputObject)) {
+        Write-Host ('    {0} {1}' -f $(if ($line.SideIndicator -eq '<=') { 'before:' } else { 'after: ' }), $line.InputObject)
+    }
     $failed++
 }
 else {
