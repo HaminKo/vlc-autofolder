@@ -8,11 +8,13 @@
       (%APPDATA%\vlc\lua\intf, \modules and \extensions).
     - Adds luaintf{intf=autofolder} to the extraintf setting in vlcrc, so VLC starts the script
       at every start. Other entries in extraintf are kept, and the global lua-intf setting isn't
-      touched (chain syntax).
+      touched (chain syntax). A bare "lua" entry is removed: VLC's preferences page writes it in
+      place of ours, and it starts VLC's command-line interface. It stays when a CLI host
+      (rc-host, cli-host) is set, since then the CLI is used on purpose.
     Uninstall (-Uninstall, or uninstall.ps1):
     - Removes those files, the folders they leave empty, and autofolder.ini (the settings).
-    - Removes only our entry from extraintf. When nothing else is left, the line goes back to
-      VLC's default "#extraintf=".
+    - Removes only our entry (and a bare "lua", as above) from extraintf. When nothing else is
+      left, the line goes back to VLC's default "#extraintf=".
     Both stop while any VLC runs: VLC may save vlcrc when it closes, which would undo the change.
     vlcrc is backed up as vlcrc.autofolder-YYYYMMDD-HHMMSS.bak before every change, and only the
     extraintf line changes: the BOM, the LF line endings and all other bytes stay as they are.
@@ -37,6 +39,9 @@ $ErrorActionPreference = 'Stop'
 
 # The extraintf entry that starts autofolder. VLC splits extraintf at ":".
 $entry = 'luaintf{intf=autofolder}'
+# What VLC's preferences page (All > Interface > Main interfaces) writes in place of our entry:
+# a bare "lua", which starts VLC's command-line interface instead (measured 2026-11-14).
+$stray = 'lua'
 $source = Join-Path $PSScriptRoot 'lua'
 $luaDir = Join-Path $VlcDir 'lua'
 $vlcrc = Join-Path $VlcDir 'vlcrc'
@@ -64,54 +69,67 @@ function Get-ExtraintfEntry {
 }
 
 function Get-EditedVlcrc {
-    # vlcrc's text with our entry added, or removed with -Remove. Unchanged when there is
+    # vlcrc's text with our entry added, or removed with -Remove, and what changed: Added and
+    # Removed (our entry), Stray (a bare "lua" removed). The text is unchanged when there is
     # nothing to do. VLC reads every "extraintf=" line, in any section, and the last one wins
-    # (measured 2026-11-12), and it compares names case-sensitively (measured).
+    # (measured 2026-11-12), and it compares setting names case-sensitively (measured). The
+    # entries in a line are compared case-insensitively here (VLC's module names: not checked).
     param([string]$Text, [switch]$Remove)
+    $edit = @{ Text = $Text; Added = $false; Removed = $false; Stray = $false }
     $lines = $Text.Split("`n")
-    $set = @()      # the "extraintf=" lines
-    $default = -1   # the first "#extraintf=": how VLC writes the default (empty) value
+    $set = @()        # the "extraintf=" lines
+    $default = -1     # the first "#extraintf=": how VLC writes the default (empty) value
+    $cliHost = $false # VLC writes both commented out ("#rc-host="); set, the CLI is used on purpose
     for ($i = 0; $i -lt $lines.Length; $i++) {
         if ($lines[$i] -cmatch '^extraintf=') { $set += $i }
         elseif ($default -lt 0 -and $lines[$i] -cmatch '^#extraintf=\r?$') { $default = $i }
+        elseif ($lines[$i] -cmatch '^(rc|cli)-host=[^\r]') { $cliHost = $true }
     }
-    if ($Remove) {
-        foreach ($i in $set) {
+    $drop = @()  # the entries to take out
+    if ($Remove) { $drop += $entry }
+    if (-not $cliHost) { $drop += $stray }
+    if ($Remove -or $set.Count) {
+        # Uninstall cleans every line; install edits the line VLC uses.
+        $edited = if ($Remove) { $set } else { $set[-1] }
+        foreach ($i in $edited) {
             $line = Get-ExtraintfEntry $lines[$i]
-            if ($line.Entries -notcontains $entry) { continue }
-            $rest = @($line.Entries | Where-Object { $_ -ne $entry })
-            $value = if ($rest.Count) { 'extraintf=' + ($rest -join ':') } else { '#extraintf=' }
+            $old = $line.Entries
+            $new = @($old | Where-Object { $drop -notcontains $_ })
+            if (-not $Remove -and $new -notcontains $entry) { $new += $entry }
+            if (($new -join ':') -ceq ($old -join ':')) { continue }
+            if ($old -contains $stray -and $new -notcontains $stray) { $edit.Stray = $true }
+            if ($old -contains $entry -and $new -notcontains $entry) { $edit.Removed = $true }
+            if ($old -notcontains $entry -and $new -contains $entry) { $edit.Added = $true }
+            $value = if ($new.Count) { 'extraintf=' + ($new -join ':') } else { '#extraintf=' }
             $lines[$i] = $value + $line.End
-        }
-    }
-    elseif ($set.Count) {
-        $i = $set[-1]  # the line VLC uses
-        $line = Get-ExtraintfEntry $lines[$i]
-        if ($line.Entries -notcontains $entry) {
-            $lines[$i] = 'extraintf=' + (($line.Entries + $entry) -join ':') + $line.End
         }
     }
     elseif ($default -ge 0) {
         $end = if ($lines[$default].EndsWith("`r")) { "`r" } else { '' }
         $lines[$default] = "extraintf=$entry$end"
+        $edit.Added = $true
     }
     else {
         # No extraintf line at all: add one at the end (VLC ignores sections, measured).
         if ($Text -and -not $Text.EndsWith("`n")) { $Text += "`n" }
-        return $Text + "extraintf=$entry`n"
+        $edit.Text = $Text + "extraintf=$entry`n"
+        $edit.Added = $true
+        return $edit
     }
     $result = $lines -join "`n"
     # VLC cuts each line's last character as its line break, so an edited last line needs one.
     if ($result -cne $Text -and -not $result.EndsWith("`n")) { $result += "`n" }
-    $result
+    $edit.Text = $result
+    $edit
 }
 
 function Save-Vlcrc {
-    # Edits vlcrc with Get-EditedVlcrc, backing it up first. Returns $true when it changed.
+    # Edits vlcrc with Get-EditedVlcrc, backing it up first. Returns what changed (see there).
     param([switch]$Remove)
     $old = $latin1.GetString([IO.File]::ReadAllBytes($vlcrc))
-    $new = Get-EditedVlcrc -Text $old -Remove:$Remove
-    if ($new -ceq $old) { return $false }
+    $edit = Get-EditedVlcrc -Text $old -Remove:$Remove
+    $new = $edit.Text
+    if ($new -ceq $old) { return $edit }
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $backup = Join-Path $VlcDir "vlcrc.autofolder-$stamp.bak"
     for ($n = 2; Test-Path -LiteralPath $backup; $n++) { $backup = Join-Path $VlcDir "vlcrc.autofolder-$stamp-$n.bak" }
@@ -121,7 +139,18 @@ function Save-Vlcrc {
     $temp = "$vlcrc.autofolder-new"
     [IO.File]::WriteAllBytes($temp, $latin1.GetBytes($new))
     [IO.File]::Replace($temp, $vlcrc, [NullString]::Value)
-    $true
+    $edit
+}
+
+function Write-VlcrcChange {
+    # One line per change Save-Vlcrc made, or $Unchanged when it made none.
+    param([hashtable]$Edit, [string]$Unchanged)
+    if ($Edit.Stray) {
+        Write-Host "vlcrc: removed `"$stray`" from extraintf (VLC's preferences page writes it in place of autofolder's entry; it starts VLC's command-line interface)"
+    }
+    if ($Edit.Removed) { Write-Host "vlcrc: removed $entry from extraintf" }
+    if ($Edit.Added) { Write-Host "vlcrc: added $entry to extraintf" }
+    if (-not ($Edit.Stray -or $Edit.Removed -or $Edit.Added)) { Write-Host $Unchanged }
 }
 
 if (Get-Process vlc -ErrorAction SilentlyContinue) {
@@ -157,11 +186,8 @@ if ($Uninstall) {
     if (-not (Test-Path -LiteralPath $vlcrc -PathType Leaf)) {
         Write-Host "There is no vlcrc in $VlcDir, so there was no setting to remove."
     }
-    elseif (Save-Vlcrc -Remove) {
-        Write-Host "vlcrc: removed $entry from extraintf"
-    }
     else {
-        Write-Host "vlcrc: extraintf didn't start autofolder (no change)"
+        Write-VlcrcChange (Save-Vlcrc -Remove) "vlcrc: extraintf didn't start autofolder (no change)"
     }
     Write-Host 'Uninstalled. VLC no longer starts autofolder.' -ForegroundColor Green
 }
@@ -176,12 +202,7 @@ else {
         Copy-Item -LiteralPath (Join-Path $source $file) -Destination $target -Force
     }
     Write-Host "Copied $($files.Count) files to $luaDir"
-    if (Save-Vlcrc) {
-        Write-Host "vlcrc: added $entry to extraintf"
-    }
-    else {
-        Write-Host 'vlcrc: extraintf already starts autofolder (no change)'
-    }
+    Write-VlcrcChange (Save-Vlcrc) 'vlcrc: extraintf already starts autofolder (no change)'
     Write-Host 'Installed. Start VLC and open a video: the other videos of its folder join the playlist.' -ForegroundColor Green
 }
 exit 0

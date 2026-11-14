@@ -2,6 +2,14 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: Install and uninstall remove a bare `lua` from extraintf, unless a CLI host is set
+- **Rule:** in the `extraintf` line install edits (the last one), a bare `lua` entry is removed and ours added; uninstall removes it from every `extraintf=` line along with ours. Kept when vlcrc has an uncommented `rc-host=` or `cli-host=` line with a value. A bare `luaintf` is always kept. Each removal prints its own line. This amends the 2026-11-12 rule "adds one extraintf entry; uninstall removes only that entry".
+- **Reason:** saving Tools → Preferences → All → Interface → Main interfaces turns our entry into `lua` (measured 2026-11-14), which starts VLC's command-line interface (`cli.luac`), not autofolder: a Terminal window opens with VLC (seen by the user). Without a host, that CLI is of no use on Windows, so the `lua` is our entry as the page rewrote it; with a host, someone uses the CLI on purpose. Uninstall removes it too, or uninstalling after saving that page would leave the CLI on.
+- **Who:** the user, accepting Claude's suggestions (To do 8 questions).
+- **Rejected:**
+  - Also replacing a bare `luaintf` (the to-do's first Approach): the page writes `lua`, not `luaintf` (measured), and `extraintf=luaintf` with `lua-intf=X` is how other Lua add-ons are set up, so replacing it could switch one off.
+  - Uninstall keeping a bare `lua` (the to-do's first suggestion): it would leave the CLI on after uninstalling, for a `lua` that our entry caused.
+
 ## 2026-11-14: README pictures: made by a script with the portable VLC and a demo folder
 - **Rule:** `docs/images/playlist.png` (the playlist after opening only "Lecture 4 - Loops.mkv") and `docs/images/settings.png` (the settings dialog) are made by `tests\make-screenshots.ps1` (run by hand) from the portable test VLC, never the installed one. The demo folder is 10 files "Lecture 1 - Introduction.mkv" … "Lecture 10 - Review.mkv" in `%TEMP%`, each a 2-minute solid-colour YUV4MPEG2 video, dated one day apart. How the window is set up and captured: research/vlc-lua-api.md, "Screenshots of the Qt window".
 - **Reason:** no private file names on GitHub, the user's VLC settings stay untouched, and the pictures can be made again after a change.
@@ -61,6 +69,7 @@ One entry per decision, newest first. Each entry has the date and the decision a
   - install.ps1 copies `lua\` into VLC's user folder and adds `luaintf{intf=autofolder}` to `extraintf` in vlcrc (chain syntax), keeping other entries; `lua-intf` is never touched. Running it again updates the files and leaves vlcrc alone.
   - The entry goes into the last `extraintf=` line (VLC uses the last one), else replaces `#extraintf=`, else is added at the end of the file.
   - uninstall.ps1 (a wrapper for `install.ps1 -Uninstall`) removes our files, the folders they leave empty, `autofolder.ini`, and our entry; a line left empty becomes `#extraintf=` again, so a default vlcrc comes back byte for byte.
+  - Amended 2026-11-14 (To do 8): both also remove a bare `lua`, see "Install and uninstall remove a bare `lua` from extraintf".
   - Both stop while any VLC runs, and install stops when vlcrc doesn't exist yet (the user starts and closes VLC once). vlcrc is backed up (`vlcrc.autofolder-YYYYMMDD-HHMMSS.bak`) before every change and edited as Latin-1 text, so every other byte stays as it was.
 - **Reason:** other settings may have changed since the install, so restoring a backup could undo them. Chain syntax lets another Lua interface keep `lua-intf` (measured in To do 1). Latin-1 maps bytes to characters one to one, so the BOM, LF endings and UTF-8 or ANSI text survive without the script knowing the encoding.
 - **Who:** the user, accepting Claude's suggestions (To do 4 questions).

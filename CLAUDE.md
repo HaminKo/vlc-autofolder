@@ -60,7 +60,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - MIT license; the copyright line names "the vlc-autofolder authors", never a person or login.
 - The repo goes public with its full history; the commit author email stays as it is (no rewrite, no clean repo).
 - README.md lists each feature in one or two lines, linking to its section in docs/guide.md.
-- install.ps1 adds `luaintf{intf=autofolder}` to vlcrc's `extraintf` (never `lua-intf`), backs up vlcrc before each change and keeps every other byte; uninstall removes only that entry, our files and autofolder.ini.
+- install.ps1 adds `luaintf{intf=autofolder}` to vlcrc's `extraintf` (never `lua-intf`), backs up vlcrc before each change and keeps every other byte; uninstall removes only that entry, our files and autofolder.ini. Both also remove a bare `lua` (what VLC's preferences page writes in place of ours) unless `rc-host`/`cli-host` is set; a bare `luaintf` stays.
 - The folder sits where the playing item is (in a build the opened file, so at the end), else where its first item is; the user's own items keep their order around it.
 - Only a file just opened builds: the playlist's last item (by position, not id), started within 10 s of becoming last (the first play after VLC starts always counts). One copy per folder file.
 - A build runs whole, in one poll, at once (measured fast for 500 files); a folder that can't be read is logged, not retried.

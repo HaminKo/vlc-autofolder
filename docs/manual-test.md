@@ -150,7 +150,14 @@ The three settings are in Tools → Preferences (Show settings: Simple) → Inte
    Select-String -Path "$env:APPDATA\vlc\vlcrc" -Pattern '^#?(extraintf|one-instance|one-instance-when-started-from-file|playlist-enqueue)='
    ```
    See: `extraintf=luaintf{intf=autofolder}` (saving the preferences kept it), and with the defaults `#one-instance=0`, `#one-instance-when-started-from-file=1`, `#playlist-enqueue=0`.
-7. **Main interfaces boxes** (not checked yet: write down what you see). Start VLC, Tools → Preferences, Show settings: All, Interface → Main interfaces. Write down the "Extra interface modules" text. Tick "Web", untick it again, Save, close VLC. Run the command from step 6 again and write down the `extraintf` line. If it isn't `extraintf=luaintf{intf=autofolder}`, double-click `install.cmd`, run the command again, and write that line down too.
+7. **Main interfaces boxes.** Start VLC, Tools → Preferences, Show settings: All, Interface → Main interfaces. Tick "Web", untick it again, Save, close VLC. Run the command from step 6 again.
+   See: `extraintf=lua` (the page replaced autofolder's entry). Start VLC from the Start menu.
+   See: a Terminal window opens too (VLC's command-line interface; seen 2026-11-14). Close VLC, wait 5 s, then:
+   ```powershell
+   Get-Process vlc -ErrorAction SilentlyContinue
+   ```
+   See: nothing (if it lists a VLC, write that down and end it with `Stop-Process -Name vlc`). Double-click `install.cmd`.
+   See: `vlcrc: removed "lua" from extraintf (VLC's preferences page writes it in place of autofolder's entry; ...)`, then `vlcrc: added luaintf{intf=autofolder} to extraintf`. The command from step 6 shows `extraintf=luaintf{intf=autofolder}` again. Double-click `Episode 1.mkv`: the 16 videos, and no console window. Close VLC.
 
 ## 11. Uninstall and install again
 1. Close VLC. Double-click `uninstall.cmd` in the project folder.

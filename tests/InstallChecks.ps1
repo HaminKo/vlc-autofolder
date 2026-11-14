@@ -58,11 +58,13 @@ function Compare-VlcrcText {
 
 function Get-TestVlcrc {
     # A short vlcrc like VLC writes it (BOM, LF, sections), with $Extraintf as the extraintf
-    # line(s). Non-ASCII bytes (UTF-8 e-acute) and a similar setting must stay untouched.
+    # line(s). Non-ASCII bytes (UTF-8 e-acute) and a similar setting must stay untouched; the CLI
+    # hosts are commented out, as VLC writes them by default.
     param([string]$Extraintf)
     $bom = $latin1.GetString([byte[]](0xEF, 0xBB, 0xBF))
     $eAcute = $latin1.GetString([byte[]](0xC3, 0xA9))
     $bom + "###`n###  vlc 3.0.24`n###`n`n[lua] # Lua interpreter`n`n# Lua interface (string)`n#lua-intf=dummy`n`n" +
+    "# TCP command input (string)`n#rc-host=`n`n# CLI input (string)`n#cli-host=`n`n" +
     "[ntservice] # Windows Service interface`n`n# Extra interface modules (string)`nntservice-extraintf=http`n`n" +
     "[core] # core program`n`n# Extra interface modules (string)`n$Extraintf`n`n# Control interfaces (string)`n#control=`n`n" +
     "[qt] # Qt interface`n`nqt-privacy-ask=0`nsnapshot-path=C:\Users\caf$eAcute\Pictures`n"
@@ -97,8 +99,22 @@ function Get-InstallCheckLine {
         @{ Name = 'two-lines'; Before = "extraintf=http`n`nextraintf="; Installed = "extraintf=http`n`n$ours"; Uninstalled = "extraintf=http`n`n#extraintf=" }
         # VLC compares names case-sensitively, so it ignores "ExtraIntf=", and so must we.
         @{ Name = 'case'; Before = "#extraintf=`nExtraIntf=x"; Installed = "$ours`nExtraIntf=x"; Uninstalled = "#extraintf=`nExtraIntf=x" }
+        # VLC's preferences page writes a bare "lua" (its command-line interface) in place of ours.
+        @{ Name = 'prefs-page'; Before = 'extraintf=lua'; Installed = $ours; Uninstalled = '#extraintf='; Says = 'removed "lua" from extraintf' }
+        @{ Name = 'prefs-page-other'; Before = 'extraintf=http:lua'; Installed = 'extraintf=http:luaintf{intf=autofolder}'; Uninstalled = 'extraintf=http' }
+        # What install made of it before To do 8.
+        @{ Name = 'prefs-page-reinstalled'; Before = 'extraintf=lua:luaintf{intf=autofolder}'; Installed = $ours; Uninstalled = '#extraintf=' }
+        # With a CLI host set, "lua" is the CLI used on purpose: it stays.
+        @{ Name = 'rc-host'; Before = "rc-host=localhost:4212`n`nextraintf=lua"; Installed = "rc-host=localhost:4212`n`nextraintf=lua:luaintf{intf=autofolder}"; Uninstalled = "rc-host=localhost:4212`n`nextraintf=lua" }
+        @{ Name = 'cli-host'; Before = "cli-host=localhost:4213`n`nextraintf=lua"; Installed = "cli-host=localhost:4213`n`nextraintf=lua:luaintf{intf=autofolder}"; Uninstalled = "cli-host=localhost:4213`n`nextraintf=lua" }
+        # An empty host is no host.
+        @{ Name = 'host-empty'; Before = "rc-host=`n`nextraintf=lua"; Installed = "rc-host=`n`n$ours"; Uninstalled = "rc-host=`n`n#extraintf=" }
+        # Install edits only the line VLC uses; uninstall cleans every line.
+        @{ Name = 'prefs-page-two-lines'; Before = "extraintf=lua`n`nextraintf=http"; Installed = "extraintf=lua`n`nextraintf=http:luaintf{intf=autofolder}"; Uninstalled = "#extraintf=`n`nextraintf=http" }
+        # A bare "luaintf" runs lua-intf, maybe another add-on's script: it stays.
+        @{ Name = 'luaintf'; Before = 'extraintf=luaintf'; Installed = 'extraintf=luaintf:luaintf{intf=autofolder}'; Uninstalled = 'extraintf=luaintf' }
     ) | ForEach-Object {
-        @{ Name = $_.Name; Before = Get-TestVlcrc $_.Before; Installed = Get-TestVlcrc $_.Installed; Uninstalled = Get-TestVlcrc $_.Uninstalled }
+        @{ Name = $_.Name; Says = $_.Says; Before = Get-TestVlcrc $_.Before; Installed = Get-TestVlcrc $_.Installed; Uninstalled = Get-TestVlcrc $_.Uninstalled }
     }
     $variants += @{ Name = 'none'; Before = $none; Installed = "$none`n$ours`n"; Uninstalled = "$none`n#extraintf=`n" }
     # The extraintf line last, with no line break: install adds one (VLC cuts a line's last character).
@@ -121,6 +137,7 @@ function Get-InstallCheckLine {
 
         $r = Invoke-SetupScript $installScript $dir
         Get-CheckLine "$n install exit code" ($r.Code -eq 0) "$($r.Code): $($r.Text)"
+        if ($v.Says) { Get-CheckLine "$n install message" $r.Text.Contains($v.Says) "[$($r.Text)] has no [$($v.Says)]" }
         Compare-VlcrcText "$n install vlcrc" $dir $v.Installed
         Get-CheckLine "$n install backups" ((Get-BackupCount $dir) -eq $changes) "$(Get-BackupCount $dir), expected $changes"
         if ($changes) {
@@ -180,6 +197,15 @@ function Get-InstallCheckLine {
     Copy-Item -LiteralPath (Join-Path $root 'install.cmd') -Destination $dir
     $r = Invoke-CmdScript (Join-Path $dir 'install.cmd') $dir
     Get-CheckLine 'install.cmd alone says to extract the zip' ($r.Code -eq 1 -and $r.Text -match 'extract it first') "$($r.Code): $($r.Text)"
+
+    # VLC's preferences page saved after the install, then uninstall: the "lua" it left goes too.
+    $dir = Join-Path $base 'prefs-page-uninstall'
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $dir 'vlcrc'), $latin1.GetBytes((Get-TestVlcrc 'extraintf=http:lua')))
+    $r = Invoke-SetupScript $uninstallScript $dir
+    Get-CheckLine 'prefs-page uninstall exit code and message' ($r.Code -eq 0 -and $r.Text.Contains('removed "lua" from extraintf')) "$($r.Code): $($r.Text)"
+    Compare-VlcrcText 'prefs-page uninstall vlcrc' $dir (Get-TestVlcrc 'extraintf=http')
+    Get-CheckLine 'prefs-page uninstall backups' ((Get-BackupCount $dir) -eq 1) "$(Get-BackupCount $dir), expected 1"
     'done'
 }
 
