@@ -28,7 +28,7 @@ Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to
 - Linux and macOS.
 
 ## Before a public release
-- A fresh subagent that hasn't seen the project checks README.md and the docs it links against the code. It only reports; the user decides the fixes.
+- Trim the README with the trim-readme skill: the 2026-11-14 docs review found Install only as the 7th section, after ~75 lines of details. Also a "get the files" step (Code → Download ZIP → Extract All) before Install.
 - Download the repo as a zip, unpack it with Explorer and double-click `install.cmd`: if Windows warns first (the zip's files come "from the internet"), say in the README what to click. Also check the `.cmd` files have CRLF line endings in the zip.
 - A screenshot in the README (the playlist after opening one file, and the sort dialog).
 - Run docs/manual-test.md on the installed VLC again if the code changed since its full run (2026-11-13, To do 5).

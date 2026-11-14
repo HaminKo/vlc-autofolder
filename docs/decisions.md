@@ -2,6 +2,12 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: Pre-release docs review: what was fixed and what was left
+- **Rule:** a fresh subagent checked README.md and docs/manual-test.md against the code (13 findings). Fixed: the checklist's missing setup-tools step, the uninstall message order, the test-output quote and the `.dot-hidden.mkv` note in Explorer; in the README, "never change the playlist", how a wrong `extensions` value is handled and where a start-time warning shows, and the missing-`autofolder_settings.lua` entry. The `.m3u` claim now says "of several files". Left as they are: "within about two seconds" (worked out as ~1.2-2.4 s from the code, not measured), a dot-named file you open yourself staying in the playlist, and the install's "VLC is running" message not being quoted.
+- **Reason:** the ones left are fair as written or edge cases, and the README should get shorter, not longer. A one-entry `.m3u` may build its file's folder (inferred, not tested); the new wording is true either way.
+- **Who:** the user, taking Claude's suggestions.
+- **Rejected:** changing install.ps1 to drop a bare `luaintf` before it's known that VLC's preferences write one (research/vlc-lua-api.md; manual-test step 10.7): a bare `luaintf` may be the user's own `lua-intf` setup.
+
 ## 2026-11-14: The repo goes public with its history; the commit author email stays
 - **Rule:** no clean one-commit repo is needed: the privacy check (Before a public release) found no personal paths, PC name or GitHub login in any tracked file, any commit's files or any commit message. The commit author and committer (the repo's own git identity, name and email) stay as they are in all commits and will be public.
 - **How it was checked:** `git grep` over every commit (`git rev-list --all`) for the user folder name, the login, the PC name, email addresses, drive and UNC paths (every hit read: all are test or example paths such as `C:\F\a.mkv`, `D:\Shows\`, `\\127.0.0.1\C$\...`), plus the commit messages and the files that were tracked once and are gone now (only to-do files, moved to docs/archive/). docs/local.md was never committed.

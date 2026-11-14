@@ -15,7 +15,11 @@ The parts the automated tests can't reach: Explorer double-clicks, drag and drop
    ```powershell
    Get-Process vlc -ErrorAction SilentlyContinue
    ```
-2. Make the test videos (about 5 s; it also runs one automated case and ends with `1 case(s), 0 failure(s)`). Don't run the automated tests while your VLC is open: they fail when `%APPDATA%\vlc` changes. Every test run deletes and rebuilds the test folder, and only this case makes the 500-video folder: after any other run, do this step again.
+2. Make the test videos (about 5 s; it also runs one automated case and ends with `1 case(s), 0 failure(s), ...`). Don't run the automated tests while your VLC is open: they fail when `%APPDATA%\vlc` changes. Every test run deletes and rebuilds the test folder, and only this case makes the 500-video folder: after any other run, do this step again. Once per PC (there's no `tools\` folder yet, e.g. in a fresh clone), first download the test VLC and luacheck:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\tests\setup-tools.ps1
+   ```
+   Then:
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Case build-big
    ```
@@ -23,7 +27,7 @@ The parts the automated tests can't reach: Explorer double-clicks, drag and drop
    ```powershell
    explorer "$env:TEMP\vlc-autofolder-tests\media"
    ```
-   Its 16 videos, oldest first (each a 2-minute grey picture): `Episode 10.mkv`, `Episode 2.mkv`, `Episode 1.mkv`, `episode 3.MP4`, `hash # sign.mkv`, `percent 100% and %20 literal.mkv`, `a & b.mkv`, `[Group] Title [1080p].mkv`, `it's here.mp4`, `comma, here.avi`, `plus+equals=semi;colon.webm`, `café.mkv`, `日本語.mkv`, `🎬 clip.mp4`, `double  space.mov`, `attribute-hidden.mkv` (Explorer hides it). Never in the playlist: `.dot-hidden.mkv`, `Episode 1.srt`, `cover.jpg`, `notes.txt`, `info.nfo`, `playlist.m3u` and the folder `Season 2`.
+   Its 16 videos, oldest first (each a 2-minute grey picture): `Episode 10.mkv`, `Episode 2.mkv`, `Episode 1.mkv`, `episode 3.MP4`, `hash # sign.mkv`, `percent 100% and %20 literal.mkv`, `a & b.mkv`, `[Group] Title [1080p].mkv`, `it's here.mp4`, `comma, here.avi`, `plus+equals=semi;colon.webm`, `café.mkv`, `日本語.mkv`, `🎬 clip.mp4`, `double  space.mov`, `attribute-hidden.mkv` (Explorer hides it). Never in the playlist: `.dot-hidden.mkv` (Explorer shows it, between `double  space.mov` and `attribute-hidden.mkv`: a leading dot doesn't hide a file in Windows), `Episode 1.srt`, `cover.jpg`, `notes.txt`, `info.nfo`, `playlist.m3u` and the folder `Season 2`.
 4. Make VLC the default app for `.mkv`: Settings → Apps → Default apps, search `.mkv`, pick VLC media player. (Or use right-click → Open with → VLC media player wherever this list says double-click: the same command.) The list double-clicks only `.mkv` files.
 5. The settings at their defaults: this prints `False` (no settings file), or View → Auto Folder Playlist settings in VLC shows "Date modified, oldest first" and the default video types.
    ```powershell
@@ -146,10 +150,11 @@ The three settings are in Tools → Preferences (Show settings: Simple) → Inte
    Select-String -Path "$env:APPDATA\vlc\vlcrc" -Pattern '^#?(extraintf|one-instance|one-instance-when-started-from-file|playlist-enqueue)='
    ```
    See: `extraintf=luaintf{intf=autofolder}` (saving the preferences kept it), and with the defaults `#one-instance=0`, `#one-instance-when-started-from-file=1`, `#playlist-enqueue=0`.
+7. **Main interfaces boxes** (not checked yet: write down what you see). Start VLC, Tools → Preferences, Show settings: All, Interface → Main interfaces. Write down the "Extra interface modules" text. Tick "Web", untick it again, Save, close VLC. Run the command from step 6 again and write down the `extraintf` line. If it isn't `extraintf=luaintf{intf=autofolder}`, double-click `install.cmd`, run the command again, and write that line down too.
 
 ## 11. Uninstall and install again
 1. Close VLC. Double-click `uninstall.cmd` in the project folder.
-   See: `Backed up vlcrc to ...`, `Removed 4 files from ...`, `Removed the settings file ...autofolder.ini`, `vlcrc: removed luaintf{intf=autofolder} from extraintf`, then `Uninstalled.` in green.
+   See: `Removed 4 files from ...`, `Removed the settings file ...autofolder.ini`, `Backed up vlcrc to ...`, `vlcrc: removed luaintf{intf=autofolder} from extraintf`, then `Uninstalled.` in green.
 2. vlcrc differs from the backup the uninstall made only in the extraintf line:
    ```powershell
    $baks = @(Get-ChildItem "$env:APPDATA\vlc\vlcrc.autofolder-*.bak" | Sort-Object Name); Compare-Object (Get-Content $baks[-1].FullName) (Get-Content "$env:APPDATA\vlc\vlcrc")
