@@ -71,7 +71,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - docs/archive/: finished to-dos' files, read only when a to-do names one
 - docs/manual-test.md: the manual test checklist, on the installed VLC
 - docs/decisions.md
-- docs/research/: one file per topic (vlc-lua-api.md so far)
+- docs/research/: one file per topic (vlc-lua-api.md; vlc-startup-time.md: why VLC's first start is slow)
 
 ## Never in tracked files
 - Personal paths (the user folder, drive paths): they go in docs/local.md.
