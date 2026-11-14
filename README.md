@@ -96,3 +96,6 @@ The parts the tests can't reach (Explorer double-clicks, the dialog, the playlis
 - [VLC media player](https://www.videolan.org/vlc/) and its Lua scripting interface, by VideoLAN and the VLC authors (GPL-2.0-or-later).
 - [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer) by Microsoft (MIT): a development check only.
 - [luacheck](https://github.com/lunarmodules/luacheck) by Peter Melnichenko and the Lunar Modules team (MIT): a development check only, downloaded by `tests\setup-tools.ps1`.
+
+## License
+MIT: see [LICENSE](LICENSE).

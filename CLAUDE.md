@@ -55,6 +55,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - Tests run the real VLC 3.0.24 with no window, isolated from the real settings; there is no screenshot GUI test.
 - The test VLC is the portable zip in `tools\vlc` with a `portable\` folder; test runs always pass `--no-one-instance` and `--no-crashdump`.
 - Public on GitHub later.
+- MIT license; the copyright line names "the vlc-autofolder authors", never a person or login.
 - install.ps1 adds `luaintf{intf=autofolder}` to vlcrc's `extraintf` (never `lua-intf`), backs up vlcrc before each change and keeps every other byte; uninstall removes only that entry, our files and autofolder.ini.
 - The folder sits where the playing item is (in a build the opened file, so at the end), else where its first item is; the user's own items keep their order around it.
 - Only a file just opened builds: the playlist's last item (by position, not id), started within 10 s of becoming last (the first play after VLC starts always counts). One copy per folder file.

@@ -2,6 +2,14 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-14: MIT license, "Copyright (c) 2026 the vlc-autofolder authors"
+- **Rule:** the repo is under the MIT license (LICENSE in the root, a License line in the README). The copyright line names "the vlc-autofolder authors", not a person. No license header in each source file.
+- **Reason:** all code is the project's own (nothing copied or adapted from VLC), so any license works. MIT is the short, usual choice for a small tool and is GPL-compatible, so it doesn't clash with VLC (GPL-2.0-or-later) running the scripts. The group name keeps the GitHub login out of tracked files (CLAUDE.md "Never in tracked files"); git history still records the author.
+- **Who:** the user, taking Claude's suggestions (Before a public release).
+- **Rejected:**
+  - GPL-2.0-or-later, to match VLC: copyleft protects little for a few small scripts, and the license text is much longer.
+  - The user's real name or GitHub login in the copyright line: the login must stay out of tracked files, and the real name isn't needed.
+
 ## 2026-11-12: The manual checklist runs on the installed VLC; network paths through `\\127.0.0.1\C$` and a mapped drive
 - **Rule:** docs/manual-test.md is run by the user on their own installed VLC 3.0.24 (Explorer double-clicks with VLC as the default app for `.mkv`, the real vlcrc, the install scripts without `-VlcDir`). Network paths are tested through the PC's own admin share and a drive letter mapped to it.
 - **Reason:** the checklist covers what the headless tests can't reach (the Qt windows, Explorer, the one-instance settings, install on a real vlcrc), and those exist only in the installed VLC. The user has no network share.

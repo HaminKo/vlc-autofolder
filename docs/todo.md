@@ -3,7 +3,7 @@
 ## Where we are
 - Now: Before a public release (no to-dos open)
 - Next: none
-- Updated: 2026-11-13
+- Updated: 2026-11-14
 
 The requirements are in [spec.md](spec.md), and the API facts and open questions in [research/vlc-lua-api.md](research/vlc-lua-api.md).
 
@@ -28,7 +28,6 @@ Next number: 7. Numbers are permanent: never renumber or reuse one; to move a to
 - Linux and macOS.
 
 ## Before a public release
-- Pick a license and add a LICENSE file. Ask the user. *Suggested: MIT, or GPL-2.0-or-later to match VLC.*
 - Search all tracked files for the "Never in tracked files" list in CLAUDE.md. If old commits hold any of it, publish a new repo with one clean commit instead of rewriting history.
 - A fresh subagent that hasn't seen the project checks README.md and the docs it links against the code. It only reports; the user decides the fixes.
 - Download the repo as a zip, unpack it with Explorer and double-click `install.cmd`: if Windows warns first (the zip's files come "from the internet"), say in the README what to click. Also check the `.cmd` files have CRLF line endings in the zip.
