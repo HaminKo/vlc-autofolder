@@ -3,7 +3,7 @@
 The details behind the [README](../README.md): what works, the settings file, VLC's one-instance settings, troubleshooting, limitations and what the install changes.
 
 ## What works
-In development. Built for VLC 3.0.24 on Windows 11. What works so far:
+Released; versions and what changed: [CHANGELOG.md](../CHANGELOG.md). Built for VLC 3.0.24 on Windows 11. What works:
 - Opening a video (double-click, Open File, or dropping it on the video picture) adds the other videos of its folder, before and after it, in the sort order you chose (date modified, oldest first, unless you change it). The folder goes at the end of the playlist, after items you added yourself, which keep their order.
 - The sort order and the video file types are set in a dialog (View menu) or a small settings file (see below); a new sort order re-sorts the playlist within about two seconds, without restarting VLC.
 - Opening a video from another folder replaces the previous folder's videos with the new folder's; your own items stay.

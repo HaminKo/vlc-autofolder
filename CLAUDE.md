@@ -58,7 +58,7 @@ Reasons, who decided, and what was rejected: docs/decisions.md.
 - The test VLC is the portable zip in `tools\vlc` with a `portable\` folder; test runs always pass `--no-one-instance` and `--no-crashdump`.
 - Public on GitHub since 2026-11-14 (version 0.1.0). Main can't be force-pushed or deleted (ruleset "Protect main").
 - MIT license; the copyright line names "the vlc-autofolder authors", never a person or login.
-- Semantic versioning from 0.1.0; a release sets the number in CHANGELOG.md and in the dialog's `descriptor()`, then gets an annotated tag `vX.Y.Z` and a GitHub Release whose notes are its changelog section. The changelog has no compare links (the repo URL names the account).
+- Semantic versioning from 0.1.0; a release sets the number in CHANGELOG.md and in the dialog's `descriptor()` (README and guide name no version), then gets an annotated tag `vX.Y.Z` and a GitHub Release whose notes are its changelog section. The changelog has no compare links (the repo URL names the account).
 - The repo goes public with its full history; the commit author email stays as it is (no rewrite, no clean repo).
 - README.md lists each feature in one or two lines, linking to its section in docs/guide.md.
 - install.ps1 adds `luaintf{intf=autofolder}` to vlcrc's `extraintf` (never `lua-intf`), backs up vlcrc before each change and keeps every other byte; uninstall removes only that entry, our files and autofolder.ini. Both also remove a bare `lua` (what VLC's preferences page writes in place of ours) unless `rc-host`/`cli-host` is set; a bare `luaintf` stays.

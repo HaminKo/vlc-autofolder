@@ -2,6 +2,12 @@
 
 One entry per decision, newest first. Each entry has the date and the decision as its heading, then the reason, who decided, and what was rejected and why.
 
+## 2026-11-19: README and guide say "Released" with no version number
+- **Rule:** the status line in README.md ("## Status") and docs/guide.md ("## What works") says "Released; versions and what changed: CHANGELOG.md", with no version number or date. The version stays only in CHANGELOG.md and the dialog's `descriptor()`. This replaces the "In development" those lines held until the 0.1.0 release.
+- **Reason:** a version number in the README goes stale at the next release unless someone remembers two more files; GitHub already shows the latest release beside the repo. The README rule also says no numbers that change often.
+- **Who:** the user, taking Claude's suggestion.
+- **Rejected:** "Version 0.1.0, released 2026-11-14" in both lines (the user's first wording), with README and guide added to the release steps.
+
 ## 2026-11-14: GitHub settings after going public: main is protected; secret scanning stays off
 - **Rule:** a ruleset "Protect main" on the default branch blocks deleting it and force-pushing to it, with no bypass (not even the owner). Normal pushes need no pull request or review. To rewrite history on purpose (e.g. to remove a committed secret), turn the ruleset off in Settings → Rules → Rulesets, push, and turn it on again.
 - **Reason:** the history is public now; a force-push would leave every clone out of step with GitHub.

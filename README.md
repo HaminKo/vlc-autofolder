@@ -7,7 +7,7 @@ When you open a single video file in VLC 3.0 on Windows (for example by double-c
 ![VLC's playlist after opening only "Lecture 4 - Loops.mkv": the other nine lectures of its folder are added before and after it, in order](docs/images/playlist.png)
 
 ## Status
-In development. Built for VLC 3.0.24 on Windows 11. What works so far ([details](docs/guide.md#what-works)):
+Released; versions and what changed: [CHANGELOG.md](CHANGELOG.md). Built for VLC 3.0.24 on Windows 11. What works ([details](docs/guide.md#what-works)):
 - **Opening a video** by double-click, Open File, or a drop on the video picture. Its folder goes at the end of the playlist; your own items stay.
 - **Another folder** replaces the previous folder's videos; the same folder again leaves one copy of each file.
 - **Large folders and network paths** (`\\server\share\...`, mapped drives).
